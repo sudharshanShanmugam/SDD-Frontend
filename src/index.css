@@ -1,0 +1,289 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   CSS Custom Properties
+   ============================================================ */
+:root {
+  /* Sidebar widths */
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 64px;
+  --topbar-height: 64px;
+  --project-sidebar-width: 220px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+
+  /* Scrollbar */
+  --scrollbar-width: 6px;
+  --scrollbar-thumb: #CBD5E1;
+  --scrollbar-track: transparent;
+}
+
+/* ============================================================
+   Global Reset & Base
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  font-variation-settings: 'opsz' 32;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F8FAFC;
+  color: #1E293B;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Custom Scrollbars
+   ============================================================ */
+::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-width);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* ============================================================
+   Focus Styles
+   ============================================================ */
+:focus-visible {
+  outline: 2px solid #6366F1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ============================================================
+   Typography
+   ============================================================ */
+code, kbd, pre, samp {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace;
+  font-size: 0.875em;
+}
+
+/* ============================================================
+   Utility Classes
+   ============================================================ */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-ai {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #2563EB 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Shimmer loading effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      #F1F5F9 25%,
+      #E2E8F0 50%,
+      #F1F5F9 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Glass morphism */
+  .glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .glass-dark {
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Truncate multi-line */
+  .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* No select */
+  .no-select {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Scrollable */
+  .scrollable {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .scrollable-x {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+}
+
+/* ============================================================
+   Component Styles
+   ============================================================ */
+@layer components {
+  /* Card variants */
+  .card {
+    @apply bg-white rounded-xl border border-neutral-200 shadow-card;
+  }
+
+  .card-hover {
+    @apply card transition-shadow duration-200 hover:shadow-card-hover cursor-pointer;
+  }
+
+  /* Status dot */
+  .status-dot {
+    @apply w-2 h-2 rounded-full inline-block;
+  }
+
+  .status-dot-success { @apply bg-success-500; }
+  .status-dot-warning { @apply bg-warning-500; }
+  .status-dot-error   { @apply bg-error-500; }
+  .status-dot-neutral { @apply bg-neutral-400; }
+  .status-dot-primary { @apply bg-primary-500; }
+
+  /* AI confidence bar */
+  .confidence-bar {
+    @apply h-1.5 rounded-full bg-neutral-200 overflow-hidden;
+  }
+
+  .confidence-bar-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+}
+
+/* ============================================================
+   AG Grid Overrides
+   ============================================================ */
+.ag-theme-alpine {
+  --ag-font-family: 'Inter', system-ui, sans-serif;
+  --ag-font-size: 14px;
+  --ag-header-background-color: #F8FAFC;
+  --ag-header-foreground-color: #475569;
+  --ag-border-color: #E2E8F0;
+  --ag-row-border-color: #F1F5F9;
+  --ag-selected-row-background-color: #EEF2FF;
+  --ag-row-hover-color: #F8FAFC;
+  --ag-header-height: 44px;
+  --ag-row-height: 48px;
+}
+
+/* ============================================================
+   Monaco Editor Overrides
+   ============================================================ */
+.monaco-editor {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ============================================================
+   React Flow Overrides
+   ============================================================ */
+.react-flow__node {
+  font-family: 'Inter', sans-serif;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-8px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.96); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 5px  rgba(99, 102, 241, 0.4); }
+  50%       { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8); }
+}
+
+/* ============================================================
+   Print Styles
+   ============================================================ */
+@media print {
+  .no-print { display: none !important; }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  .card {
+    border: 1px solid #E2E8F0;
+    box-shadow: none;
+  }
+}
