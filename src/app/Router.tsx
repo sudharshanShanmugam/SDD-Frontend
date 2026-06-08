@@ -14,7 +14,8 @@ const WorkspaceDashboardPage = lazy(() => import('@features/dashboard/pages/Work
 const WorkspacesPage         = lazy(() => import('@features/workspaces/pages/WorkspacesPage'))
 
 // Project pages
-const ProjectDashboardPage = lazy(() => import('./pages/ProjectDashboardPage'))
+const ProjectDashboardPage   = lazy(() => import('./pages/ProjectDashboardPage'))
+const ProjectOverviewPage    = lazy(() => import('@features/dashboard/pages/ProjectOverviewPage'))
 const DocumentListPage     = lazy(() => import('@features/documents/pages/DocumentListPage'))
 const DocumentUploadPage   = lazy(() => import('@features/documents/pages/DocumentUploadPage'))
 const DocumentDetailPage   = lazy(() => import('@features/documents/pages/DocumentDetailPage'))
@@ -188,7 +189,11 @@ export function AppRouter(): React.JSX.Element {
             </ProjectRouteGuard>
           </React.Suspense>
         }>
-          <Route index element={<Navigate to="documents" replace />} />
+          <Route index element={
+            <React.Suspense fallback={<PageSpinner />}>
+              <ProjectOverviewPage />
+            </React.Suspense>
+          } />
 
           <Route path="documents" element={
             <React.Suspense fallback={<PageSpinner />}>
