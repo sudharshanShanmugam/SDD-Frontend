@@ -54,6 +54,20 @@ export default function LoginPage() {
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+          <Box
+            onClick={() => { setEmail('admin@sdd-platform.com'); setPassword('Pass@1234') }}
+            sx={{
+              border: '1px dashed', borderColor: 'primary.main', borderRadius: 2,
+              p: 1.5, mb: 2, cursor: 'pointer', bgcolor: 'primary.50',
+              '&:hover': { bgcolor: 'primary.100' },
+            }}
+          >
+            <Typography variant="caption" fontWeight={700} color="primary">Super Admin Demo</Typography>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontFamily: 'monospace' }}>
+              admin@sdd-platform.com · Pass@1234
+            </Typography>
+          </Box>
+
           <Box component="form" onSubmit={handleLogin}>
             <TextField
               label="Email" type="email" fullWidth size="small" required
