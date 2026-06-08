@@ -513,10 +513,11 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
   }, [task?.id])
 
   // Fetch workspace members for the assignee dropdown (only workspace members can be assigned)
+  const _projectId = (task as any)?.projectId ?? (task as any)?.project_id
   const { data: membersData } = useQuery({
-    queryKey: ['workspace-members-for-project', task?.projectId],
-    queryFn: () => projectsApi.listWorkspaceMembers(task!.projectId as string),
-    enabled: !!task?.projectId,
+    queryKey: ['workspace-members-for-project', _projectId],
+    queryFn: () => projectsApi.listWorkspaceMembers(_projectId as string),
+    enabled: !!_projectId,
     staleTime: 120_000,
   })
   const members: any[] = Array.isArray(membersData) ? membersData : []
