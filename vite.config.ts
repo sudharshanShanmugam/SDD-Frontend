@@ -41,11 +41,9 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: env.VITE_API_BASE_URL || 'http://localhost:8000',
           changeOrigin: true,
-          secure: false,
-          rewrite: (p) => p.replace(/^\/api/, ''),
         },
-        '/ws': {
-          target: env.VITE_WS_URL || 'ws://localhost:8000',
+        '/socket.io': {
+          target: env.VITE_WS_URL || 'http://localhost:8000',
           ws: true,
           changeOrigin: true,
         },

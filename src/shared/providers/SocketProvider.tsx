@@ -28,11 +28,13 @@ export interface SocketContextValue {
 
 const SocketContext = createContext<SocketContextValue | null>(null)
 
-// Socket.IO needs an http(s):// URL (it handles the ws:// upgrade internally)
-const SOCKET_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'http://localhost:5469'
-const SOCKET_PATH = (import.meta.env.VITE_WS_PATH as string | undefined) ?? '/socket.io'
-const RECONNECT_ATTEMPTS = Number(import.meta.env.VITE_WS_RECONNECT_ATTEMPTS) || 5
-const RECONNECT_DELAY = Number(import.meta.env.VITE_WS_RECONNECT_DELAY) || 1000
+import { WS_PATH, WS_RECONNECT_ATTEMPTS, WS_RECONNECT_DELAY } from '@/config/constants'
+
+// Empty string → socket.io connects to current origin (dev proxy handles it)
+const SOCKET_URL = import.meta.env.VITE_WS_URL || undefined
+const SOCKET_PATH = WS_PATH
+const RECONNECT_ATTEMPTS = WS_RECONNECT_ATTEMPTS
+const RECONNECT_DELAY = WS_RECONNECT_DELAY
 
 // ============================================================
 // Provider

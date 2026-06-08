@@ -11,17 +11,18 @@ import { nanoid } from 'nanoid';
 // Config
 // ============================================================
 
-const BASE_URL      = import.meta.env.VITE_API_BASE_URL as string ?? 'http://localhost:8000';
-const API_VERSION   = import.meta.env.VITE_API_VERSION as string  ?? 'v1';
-const TIMEOUT       = Number(import.meta.env.VITE_API_TIMEOUT)     || 30_000;
-const IS_DEV        = import.meta.env.DEV as boolean;
+import { API_VERSION, API_TIMEOUT } from '@/config/constants';
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const TIMEOUT  = API_TIMEOUT;
+const IS_DEV   = import.meta.env.DEV as boolean;
 
 // ============================================================
 // Axios Instance
 // ============================================================
 
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: `${BASE_URL}/api/${API_VERSION}`,
+  baseURL: BASE_URL ? `${BASE_URL}/api/${API_VERSION}` : `/api/${API_VERSION}`,
   timeout: TIMEOUT,
   headers: {
     'Content-Type': 'application/json',

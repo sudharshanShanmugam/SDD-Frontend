@@ -33,8 +33,10 @@ export interface UseWebSocketReturn {
 // Hook
 // ============================================================
 
-const SOCKET_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'http://localhost:5469'
-const SOCKET_PATH = (import.meta.env.VITE_WS_PATH as string | undefined) ?? '/socket.io'
+import { WS_PATH } from '@/config/constants'
+
+const SOCKET_URL = import.meta.env.VITE_WS_URL || undefined
+const SOCKET_PATH = WS_PATH
 
 export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketReturn {
   const {
