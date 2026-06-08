@@ -22,8 +22,11 @@ export const tasksApi = {
   update: (id: string, data: Partial<CreateTaskRequest>) =>
     put<Task>(`${BASE}/${id}`, data),
 
-  patch: (id: string, data: Partial<Task>) =>
-    patch<Task>(`${BASE}/${id}`, data),
+  patch: (id: string, data: Partial<Task> & { assigneeId?: string | null }) => {
+    const { assigneeId, ...rest } = data as any;
+    const payload = { ...rest, ...(assigneeId !== undefined ? { assignee_id: assigneeId } : {}) };
+    return patch<Task>(`${BASE}/${id}`, payload);
+  },
 
   delete: (id: string) =>
     del<void>(`${BASE}/${id}`),
