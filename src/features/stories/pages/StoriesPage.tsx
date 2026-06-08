@@ -42,15 +42,16 @@ const initialFilters: StoryFilterState = {
 
 /* ── Epic group section ────────────────────────────────────────────────────── */
 interface EpicGroupProps {
-  epicId: string;          // e.g. "E1"
-  topic: string;           // e.g. "Temple Centre Selection"
+  epicId: string;
+  topic: string;
   stories: Story[];
   onView: (s: Story) => void;
   onEdit: (s: Story) => void;
   onDelete: (id: string) => void;
+  onStatusChange: (id: string, status: any) => void;
 }
 
-const EpicGroup: React.FC<EpicGroupProps> = ({ epicId, topic, stories, onView, onEdit, onDelete }) => {
+const EpicGroup: React.FC<EpicGroupProps> = ({ epicId, topic, stories, onView, onEdit, onDelete, onStatusChange }) => {
   const [open, setOpen] = useState(true);
 
   return (
@@ -107,6 +108,7 @@ const EpicGroup: React.FC<EpicGroupProps> = ({ epicId, topic, stories, onView, o
                   onView={onView}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onStatusChange={onStatusChange}
                 />
               </motion.div>
             </Grid>
@@ -420,6 +422,7 @@ const StoriesPage: React.FC = () => {
                     onView={(s) => setDetailStoryId(s.id)}
                     onEdit={(s) => { setEditStory(s); setFormOpen(true); }}
                     onDelete={(id) => deleteStory(id)}
+                    onStatusChange={(id, status) => handleUpdate(id, { status })}
                   />
                 ))}
 
@@ -438,6 +441,7 @@ const StoriesPage: React.FC = () => {
                               onView={(s) => setDetailStoryId(s.id)}
                               onEdit={(s) => { setEditStory(s); setFormOpen(true); }}
                               onDelete={(id) => deleteStory(id)}
+                              onStatusChange={(id, status) => handleUpdate(id, { status })}
                             />
                           </motion.div>
                         </Grid>
@@ -461,6 +465,7 @@ const StoriesPage: React.FC = () => {
                         onView={(s) => setDetailStoryId(s.id)}
                         onEdit={(s) => { setEditStory(s); setFormOpen(true); }}
                         onDelete={(id) => deleteStory(id)}
+                        onStatusChange={(id, status) => handleUpdate(id, { status })}
                       />
                     </motion.div>
                   </Grid>
