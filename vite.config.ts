@@ -30,6 +30,10 @@ export default defineConfig(({ mode }) => {
         '@features': path.resolve(__dirname, './src/features'),
       },
     },
+    preview: {
+      host: true,
+      allowedHosts: ['sdd-frontend.onrender.com'],
+    },
     server: {
       port: 3000,
       host: true,
