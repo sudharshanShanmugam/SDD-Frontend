@@ -25,6 +25,7 @@ import {
   ExpandMore,
   ExpandLess,
   CheckCircle,
+  Refresh,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -304,43 +305,39 @@ const StoriesPage: React.FC = () => {
           </Box>
 
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {storyCount === 0 && (
-              <Tooltip title="Use AI to automatically generate user stories from your requirements">
-                <Button
-                  variant="outlined"
-                  color="secondary"
-                  size="small"
-                  startIcon={busy ? <CircularProgress size={14} color="inherit" /> : <AutoAwesome />}
-                  onClick={() => generateStories()}
-                  disabled={busy}
-                  sx={{ borderRadius: 2, borderColor: 'secondary.main' }}
-                >
-                  {generating ? 'Generating…' : 'Generate from Requirements'}
-                </Button>
-              </Tooltip>
-            )}
-
+            {/* Delete All */}
             {storyCount > 0 && (
-              <Tooltip title="Clear all existing stories and regenerate a fresh set from requirements">
+              <Tooltip title="Delete all stories">
                 <Button
-                  variant="outlined"
-                  color="secondary"
-                  size="small"
-                  startIcon={busy ? <CircularProgress size={14} color="inherit" /> : <AutoAwesome />}
+                  variant="outlined" size="small" color="error"
+                  startIcon={<DeleteSweep />}
                   onClick={() => setConfirmClearOpen(true)}
                   disabled={busy}
-                  sx={{ borderRadius: 2, borderColor: 'secondary.main' }}
+                  sx={{ borderRadius: 2 }}
                 >
-                  {clearing ? 'Regenerating…' : 'Regenerate Stories'}
+                  Delete All
                 </Button>
               </Tooltip>
             )}
 
+            {/* Regenerate */}
+            <Tooltip title={storyCount > 0 ? 'Regenerate stories from requirements' : 'Generate stories from requirements'}>
+              <Button
+                variant="outlined" color="secondary" size="small"
+                startIcon={busy ? <CircularProgress size={14} color="inherit" /> : (storyCount > 0 ? <Refresh /> : <AutoAwesome />)}
+                onClick={() => generateStories()}
+                disabled={busy}
+                sx={{ borderRadius: 2, borderColor: 'secondary.main' }}
+              >
+                {generating ? 'Generating…' : storyCount > 0 ? 'Regenerate' : 'Generate'}
+              </Button>
+            </Tooltip>
+
+            {/* Accept All */}
             {filtered.some(s => s.status !== 'approved' && s.status !== 'rejected') && (
-              <Tooltip title="Mark all visible stories as accepted">
+              <Tooltip title="Accept all visible stories">
                 <Button
-                  variant="outlined"
-                  size="small"
+                  variant="outlined" size="small"
                   startIcon={<CheckCircle />}
                   onClick={() => filtered
                     .filter(s => s.status !== 'approved' && s.status !== 'rejected')
@@ -354,14 +351,14 @@ const StoriesPage: React.FC = () => {
               </Tooltip>
             )}
 
+            {/* Add */}
             <Button
-              variant="contained"
-              size="small"
+              variant="contained" size="small"
               startIcon={<Add />}
               onClick={() => { setEditStory(null); setFormOpen(true); }}
               sx={{ borderRadius: 2 }}
             >
-              New Story
+              Add Story
             </Button>
           </Box>
         </Box>
@@ -536,16 +533,13 @@ const StoriesPage: React.FC = () => {
       <Dialog open={confirmClearOpen} onClose={() => setConfirmClearOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
           <DeleteSweep color="error" />
-          Clear & Regenerate Stories?
+          Delete All Stories?
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
             This will <strong>permanently delete all {storyCount} existing
-            {storyCount !== 1 ? ' stories' : ' story'}</strong> for this project and generate
-            a fresh set using AI from your requirements.
-            <br /><br />
-            This is recommended when the existing stories are outdated or were generated from
-            incomplete requirements.
+            {storyCount !== 1 ? ' stories' : ' story'}</strong> for this project.
+            This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
@@ -553,13 +547,17 @@ const StoriesPage: React.FC = () => {
             Cancel
           </Button>
           <Button
-            onClick={() => { setConfirmClearOpen(false); clearAndRegenerate(); }}
+            onClick={async () => {
+              setConfirmClearOpen(false);
+              await storiesApi.clearAll(projectId!);
+              queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
+            }}
             variant="contained"
             color="error"
-            startIcon={<AutoAwesome />}
+            startIcon={<DeleteSweep />}
             sx={{ borderRadius: 2 }}
           >
-            Yes, Clear & Regenerate
+            Delete All
           </Button>
         </DialogActions>
       </Dialog>
