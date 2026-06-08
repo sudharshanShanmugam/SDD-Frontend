@@ -389,11 +389,11 @@ function WorkLogSection({ taskId }: { taskId: string }) {
         timeLogs.map((log) => (
           <Box key={log.id} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
             <Avatar sx={{ width: 32, height: 32, fontSize: '0.7rem', bgcolor: 'secondary.main' }}>
-              {initials(log.user?.displayName)}
+              {initials(log.user?.full_name ?? (user as any)?.displayName)}
             </Avatar>
             <Box sx={{ flex: 1 }}>
               <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="caption" fontWeight={700}>{log.user?.displayName ?? 'Unknown'}</Typography>
+                <Typography variant="caption" fontWeight={700}>{log.user?.full_name ?? (user as any)?.displayName ?? 'Unknown'}</Typography>
                 <Chip
                   label={toHhMm(log.hours)}
                   size="small"
@@ -512,11 +512,11 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
     }
   }, [task?.id])
 
-  // Fetch workspace members for the assignee dropdown (only workspace members can be assigned)
+  // Fetch project members for the assignee/reporter dropdowns
   const _projectId = (task as any)?.projectId ?? (task as any)?.project_id
   const { data: membersData } = useQuery({
-    queryKey: ['workspace-members-for-project', _projectId],
-    queryFn: () => projectsApi.listWorkspaceMembers(_projectId as string),
+    queryKey: ['project-members', _projectId],
+    queryFn: () => projectsApi.listMembers(_projectId as string),
     enabled: !!_projectId,
     staleTime: 120_000,
   })
@@ -754,9 +754,9 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                     return (
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Avatar {...(user?.avatar ? { src: user.avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'primary.main' }}>
-                          {user?.displayName?.[0]}
+                          {user?.full_name ?? (user as any)?.displayName?.[0]}
                         </Avatar>
-                        <Typography variant="body2" noWrap>{user?.displayName}</Typography>
+                        <Typography variant="body2" noWrap>{user?.full_name ?? (user as any)?.displayName}</Typography>
                       </Stack>
                     );
                   }}
@@ -766,9 +766,9 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                     <MenuItem key={m.userId} value={m.userId}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Avatar {...(m.user?.avatar ? { src: m.user.avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'primary.main' }}>
-                          {m.user?.displayName?.[0]}
+                          {m.user?.full_name ?? m.user?.full_name ?? (user as any)?.displayName?.[0]}
                         </Avatar>
-                        <Typography variant="body2">{m.user?.displayName}</Typography>
+                        <Typography variant="body2">{m.user?.full_name ?? m.user?.full_name ?? (user as any)?.displayName}</Typography>
                       </Stack>
                     </MenuItem>
                   ))}
@@ -803,9 +803,9 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                     <MenuItem key={m.userId} value={m.userId}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Avatar {...(m.user?.avatar ? { src: m.user.avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'secondary.main' }}>
-                          {m.user?.displayName?.[0]}
+                          {m.user?.full_name ?? m.user?.full_name ?? (user as any)?.displayName?.[0]}
                         </Avatar>
-                        <Typography variant="body2">{m.user?.displayName}</Typography>
+                        <Typography variant="body2">{m.user?.full_name ?? m.user?.full_name ?? (user as any)?.displayName}</Typography>
                       </Stack>
                     </MenuItem>
                   ))}
