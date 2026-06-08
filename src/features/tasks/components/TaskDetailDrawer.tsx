@@ -750,13 +750,14 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                   renderValue={(val) => {
                     if (!val) return <Typography variant="body2" color="text.disabled">Unassigned</Typography>;
                     const m = members.find((m) => m.userId === val);
-                    const user = m?.user ?? task.assignee;
+                    const u = m?.user ?? (task.assignee as any);
+                    const name = u?.full_name ?? u?.displayName ?? u?.email ?? '?';
                     return (
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <Avatar {...(user?.avatar ? { src: user.avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'primary.main' }}>
-                          {user?.full_name ?? (user as any)?.displayName?.[0]}
+                        <Avatar src={u?.avatar_url ?? u?.avatar} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'primary.main' }}>
+                          {name[0]}
                         </Avatar>
-                        <Typography variant="body2" noWrap>{user?.full_name ?? (user as any)?.displayName}</Typography>
+                        <Typography variant="body2" noWrap>{name}</Typography>
                       </Stack>
                     );
                   }}
@@ -787,13 +788,14 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                   renderValue={(val) => {
                     if (!val) return <Typography variant="body2" color="text.disabled">—</Typography>;
                     const m = members.find((m) => m.userId === val);
-                    const user = m?.user ?? task.reporter;
+                    const u = m?.user ?? (task.reporter as any);
+                    const name = u?.full_name ?? u?.displayName ?? u?.email ?? '?';
                     return (
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <Avatar {...((user as any)?.avatar ? { src: (user as any).avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'secondary.main' }}>
-                          {(user as any)?.displayName?.[0]}
+                        <Avatar src={u?.avatar_url ?? u?.avatar} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'secondary.main' }}>
+                          {name[0]}
                         </Avatar>
-                        <Typography variant="body2" noWrap>{(user as any)?.displayName}</Typography>
+                        <Typography variant="body2" noWrap>{name}</Typography>
                       </Stack>
                     );
                   }}
