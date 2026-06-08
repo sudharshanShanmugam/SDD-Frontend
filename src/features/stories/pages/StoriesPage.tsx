@@ -339,10 +339,13 @@ const StoriesPage: React.FC = () => {
                 <Button
                   variant="outlined" size="small"
                   startIcon={<CheckCircle />}
-                  onClick={() => filtered
-                    .filter(s => s.status !== 'approved' && s.status !== 'rejected')
-                    .forEach(s => handleUpdate(s.id, { status: 'approved' }))
-                  }
+                  onClick={async () => {
+                    const ids = filtered
+                      .filter(s => s.status !== 'approved' && s.status !== 'rejected')
+                      .map(s => s.id);
+                    await storiesApi.bulkUpdateStatus(ids, 'approved');
+                    queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
+                  }}
                   sx={{ borderRadius: 2, color: '#10b981', borderColor: '#10b981',
                     '&:hover': { bgcolor: '#f0fdf4', borderColor: '#10b981' } }}
                 >

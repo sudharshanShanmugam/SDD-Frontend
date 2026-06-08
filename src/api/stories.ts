@@ -59,6 +59,10 @@ export const storiesApi = {
   // Delete ALL stories for a project (before clean regenerate)
   clearAll: (projectId: string) =>
     del<{ deleted: number }>(`${BASE}?project_id=${projectId}`),
+
+  // Bulk update status for multiple stories in ONE request
+  bulkUpdateStatus: (ids: string[], status: string) =>
+    patch<{ updated: number; status: string }>(`${BASE}/bulk-status`, { ids, status }),
 };
 
 interface CreateStoryRequest {
