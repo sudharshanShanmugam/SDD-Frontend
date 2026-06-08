@@ -81,14 +81,15 @@ interface StoryCardProps {
   compact?: boolean;
 }
 
+const CARD_HEIGHT = 200;
+
 const StoryCard: React.FC<StoryCardProps> = ({
   story, onEdit, onDelete, onView, onStatusChange,
-  isDragging = false, compact = false,
+  isDragging = false,
 }) => {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const stCfg     = statusConfig[story.status] ?? statusConfig.backlog;
   const leftColor = priorityBorderColor[story.priority] ?? '#6366f1';
-
   const isSettled = story.status === 'approved' || story.status === 'rejected';
 
   return (
@@ -99,6 +100,9 @@ const StoryCard: React.FC<StoryCardProps> = ({
           borderRadius: 2,
           borderLeft: `3px solid ${leftColor}`,
           cursor: 'pointer',
+          height: CARD_HEIGHT,
+          display: 'flex',
+          flexDirection: 'column',
           '&:hover': { boxShadow: 3 },
           transition: 'box-shadow 0.15s',
           ...(story.status === 'approved' && { bgcolor: '#f0fdf4' }),
@@ -107,42 +111,48 @@ const StoryCard: React.FC<StoryCardProps> = ({
         elevation={isDragging ? 8 : 0}
         onClick={() => onView?.(story)}
       >
-        <CardContent sx={{ p: compact ? 1.5 : 2, '&:last-child': { pb: compact ? 1.5 : 2 } }}>
-          {/* Header */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+        <CardContent sx={{ p: 2, pb: '12px !important', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+
+          {/* ── Header row ── */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', gap: 0.5, overflow: 'hidden' }}>
               <Chip label={story.storyId} size="small"
-                sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, fontFamily: 'monospace' }} />
+                sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, fontFamily: 'monospace', flexShrink: 0 }} />
               {story.points !== undefined && (
                 <Chip label={`${story.points} pts`} size="small" variant="outlined"
-                  sx={{ height: 18, fontSize: '0.65rem' }} />
+                  sx={{ height: 18, fontSize: '0.62rem', flexShrink: 0 }} />
               )}
             </Box>
-            <IconButton size="small" onClick={(e) => { e.stopPropagation(); setMenuAnchor(e.currentTarget); }}>
-              <MoreVert sx={{ fontSize: 16 }} />
+            <IconButton size="small" sx={{ flexShrink: 0, ml: 0.5 }}
+              onClick={(e) => { e.stopPropagation(); setMenuAnchor(e.currentTarget); }}>
+              <MoreVert sx={{ fontSize: 15 }} />
             </IconButton>
           </Box>
 
-          {/* Title */}
-          <Typography variant="body2" fontWeight={600} sx={{ mb: compact ? 0 : 0.75 }}>
+          {/* ── Title — 2 lines max ── */}
+          <Typography variant="body2" fontWeight={600}
+            sx={{ mb: 0.5, flexShrink: 0, overflow: 'hidden', display: '-webkit-box',
+                  WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
             {story.title}
           </Typography>
 
-          {!compact && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-              As a <strong>{story.asA}</strong>, I want to <em>{story.iWant}</em>
-            </Typography>
-          )}
+          {/* ── "As a … I want…" — 2 lines max ── */}
+          <Typography variant="caption" color="text.secondary"
+            sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden', mb: 'auto', lineHeight: 1.4 }}>
+            As a <strong>{story.asA}</strong>, I want <em>{story.iWant}</em>
+          </Typography>
 
-          {/* Status row */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: onStatusChange ? 1 : 0 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* ── Status + assignee row ── */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, overflow: 'hidden' }}>
               <Chip label={stCfg.label} size="small"
-                sx={{ height: 18, fontSize: '0.65rem', bgcolor: stCfg.color + '1a', color: stCfg.color, borderRadius: 1 }} />
+                sx={{ height: 18, fontSize: '0.62rem', bgcolor: stCfg.color + '1a',
+                      color: stCfg.color, borderRadius: 1, flexShrink: 0 }} />
               {story.investScore && <InvestIndicator score={story.investScore} />}
               {story.aiConfidence !== undefined && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                  <AutoAwesome sx={{ fontSize: 12, color: 'secondary.main' }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, flexShrink: 0 }}>
+                  <AutoAwesome sx={{ fontSize: 11, color: 'secondary.main' }} />
                   <Typography variant="caption" color="secondary.main">{story.aiConfidence}%</Typography>
                 </Box>
               )}
@@ -150,30 +160,32 @@ const StoryCard: React.FC<StoryCardProps> = ({
             {story.assignee && (
               <Tooltip title={story.assignee.name}>
                 <Avatar {...(story.assignee.avatar ? { src: story.assignee.avatar } : {})}
-                  alt={story.assignee.name} sx={{ width: 22, height: 22, fontSize: '0.65rem' }}>
+                  sx={{ width: 20, height: 20, fontSize: '0.6rem', flexShrink: 0 }}>
                   {story.assignee.name[0]}
                 </Avatar>
               </Tooltip>
             )}
           </Box>
 
-          {/* Accept / Decline buttons */}
+          {/* ── Accept / Decline ── */}
           {onStatusChange && !isSettled && (
-            <Stack direction="row" spacing={0.75} onClick={(e) => e.stopPropagation()}>
-              <Button size="small" variant="outlined" startIcon={<CheckCircle sx={{ fontSize: 13 }} />}
-                sx={{ fontSize: '0.68rem', py: 0.25, color: '#10b981', borderColor: '#10b981',
-                      '&:hover': { bgcolor: '#f0fdf4', borderColor: '#10b981' } }}
+            <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexShrink: 0 }}
+              onClick={(e) => e.stopPropagation()}>
+              <Button size="small" variant="outlined" startIcon={<CheckCircle sx={{ fontSize: 12 }} />}
+                sx={{ fontSize: '0.65rem', py: 0.2, flex: 1, color: '#10b981', borderColor: '#10b981',
+                      '&:hover': { bgcolor: '#f0fdf4' }, minWidth: 0 }}
                 onClick={() => onStatusChange(story.id, 'approved')}>
                 Accept
               </Button>
-              <Button size="small" variant="outlined" startIcon={<Cancel sx={{ fontSize: 13 }} />}
-                sx={{ fontSize: '0.68rem', py: 0.25, color: '#ef4444', borderColor: '#ef4444',
-                      '&:hover': { bgcolor: '#fef2f2', borderColor: '#ef4444' } }}
+              <Button size="small" variant="outlined" startIcon={<Cancel sx={{ fontSize: 12 }} />}
+                sx={{ fontSize: '0.65rem', py: 0.2, flex: 1, color: '#ef4444', borderColor: '#ef4444',
+                      '&:hover': { bgcolor: '#fef2f2' }, minWidth: 0 }}
                 onClick={() => onStatusChange(story.id, 'rejected')}>
                 Decline
               </Button>
             </Stack>
           )}
+
         </CardContent>
       </Card>
 
