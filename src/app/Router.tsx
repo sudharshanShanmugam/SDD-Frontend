@@ -27,7 +27,7 @@ const QADashboardPage      = lazy(() => import('./pages/QADashboardPage'))
 const ReleasesPage         = lazy(() => import('./pages/ReleasesPage'))
 const ApprovalsPage        = lazy(() => import('./pages/ApprovalsPage'))
 const AIWorkflowPage       = lazy(() => import('./pages/AIWorkflowPage'))
-const AIPromptsPage        = lazy(() => import('./pages/AIPromptsPage'))
+const AIPromptsPage        = lazy(() => import('@features/ai/pages/AIPromptsPage'))
 const ProjectMembersPage   = lazy(() => import('./pages/ProjectMembersPage'))
 
 // User / org pages
