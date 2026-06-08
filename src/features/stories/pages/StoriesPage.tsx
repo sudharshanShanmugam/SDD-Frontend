@@ -24,6 +24,7 @@ import {
   DeleteSweep,
   ExpandMore,
   ExpandLess,
+  CheckCircle,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -331,6 +332,24 @@ const StoriesPage: React.FC = () => {
                   sx={{ borderRadius: 2, borderColor: 'secondary.main' }}
                 >
                   {clearing ? 'Regenerating…' : 'Regenerate Stories'}
+                </Button>
+              </Tooltip>
+            )}
+
+            {filtered.some(s => s.status !== 'approved' && s.status !== 'rejected') && (
+              <Tooltip title="Mark all visible stories as accepted">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<CheckCircle />}
+                  onClick={() => filtered
+                    .filter(s => s.status !== 'approved' && s.status !== 'rejected')
+                    .forEach(s => handleUpdate(s.id, { status: 'approved' }))
+                  }
+                  sx={{ borderRadius: 2, color: '#10b981', borderColor: '#10b981',
+                    '&:hover': { bgcolor: '#f0fdf4', borderColor: '#10b981' } }}
+                >
+                  Accept All
                 </Button>
               </Tooltip>
             )}
