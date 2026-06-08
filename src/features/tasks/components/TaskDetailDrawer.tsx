@@ -766,9 +766,9 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                     <MenuItem key={m.userId} value={m.userId}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Avatar {...(m.user?.avatar ? { src: m.user.avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'primary.main' }}>
-                          {m.user?.full_name ?? m.user?.full_name ?? (user as any)?.displayName?.[0]}
+                          {(m.user?.full_name ?? m.user?.displayName ?? '?')[0]}
                         </Avatar>
-                        <Typography variant="body2">{m.user?.full_name ?? m.user?.full_name ?? (user as any)?.displayName}</Typography>
+                        <Typography variant="body2">{m.user?.full_name ?? m.user?.displayName}</Typography>
                       </Stack>
                     </MenuItem>
                   ))}
@@ -803,9 +803,9 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                     <MenuItem key={m.userId} value={m.userId}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Avatar {...(m.user?.avatar ? { src: m.user.avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'secondary.main' }}>
-                          {m.user?.full_name ?? m.user?.full_name ?? (user as any)?.displayName?.[0]}
+                          {(m.user?.full_name ?? m.user?.displayName ?? '?')[0]}
                         </Avatar>
-                        <Typography variant="body2">{m.user?.full_name ?? m.user?.full_name ?? (user as any)?.displayName}</Typography>
+                        <Typography variant="body2">{m.user?.full_name ?? m.user?.displayName}</Typography>
                       </Stack>
                     </MenuItem>
                   ))}
