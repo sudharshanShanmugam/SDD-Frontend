@@ -779,18 +779,38 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
             {/* Reporter */}
             <Box>
               <FieldLabel>Reporter</FieldLabel>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 0.75, border: '1px solid', borderColor: 'divider', borderRadius: 1, minHeight: 40, bgcolor: 'action.hover' }}>
-                {task.reporter ? (
-                  <>
-                    <Avatar src={(task.reporter as any).avatar ?? undefined} sx={{ width: 28, height: 28, fontSize: '0.7rem', bgcolor: 'secondary.main' }}>
-                      {initials((task.reporter as any).displayName)}
-                    </Avatar>
-                    <Typography variant="body2" noWrap>{(task.reporter as any).displayName}</Typography>
-                  </>
-                ) : (
-                  <Typography variant="body2" color="text.disabled">—</Typography>
-                )}
-              </Stack>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={(task.reporter as any)?.id ?? ''}
+                  displayEmpty
+                  onChange={(e) => patch({ reporterId: e.target.value || null } as any)}
+                  renderValue={(val) => {
+                    if (!val) return <Typography variant="body2" color="text.disabled">—</Typography>;
+                    const m = members.find((m) => m.userId === val);
+                    const user = m?.user ?? task.reporter;
+                    return (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Avatar {...((user as any)?.avatar ? { src: (user as any).avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'secondary.main' }}>
+                          {(user as any)?.displayName?.[0]}
+                        </Avatar>
+                        <Typography variant="body2" noWrap>{(user as any)?.displayName}</Typography>
+                      </Stack>
+                    );
+                  }}
+                >
+                  <MenuItem value=""><em>None</em></MenuItem>
+                  {members.map((m) => (
+                    <MenuItem key={m.userId} value={m.userId}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Avatar {...(m.user?.avatar ? { src: m.user.avatar } : {})} sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'secondary.main' }}>
+                          {m.user?.displayName?.[0]}
+                        </Avatar>
+                        <Typography variant="body2">{m.user?.displayName}</Typography>
+                      </Stack>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
 
             {/* Logged Hours */}
