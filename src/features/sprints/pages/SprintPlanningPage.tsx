@@ -640,9 +640,7 @@ const SprintPlanningPage: React.FC = () => {
   // ── Queries ──
   const { data: storiesData, isLoading: storiesLoading, isError: storiesError } = useQuery({
     queryKey: ['backlog-stories', projectId],
-    queryFn: () => storiesApi.list(projectId!, {
-      filters: [{ field: 'status', operator: 'nin', value: ['done', 'cancelled'] }],
-    }),
+    queryFn: () => storiesApi.list(projectId!, { status: 'approved' }),
     enabled: !!projectId,
     // Keep data fresh but avoid unnecessary re-renders
     staleTime: 30_000,

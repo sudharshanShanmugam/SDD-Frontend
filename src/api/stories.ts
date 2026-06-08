@@ -6,7 +6,7 @@ const BASE = '/stories';
 
 export const storiesApi = {
   // List stories by project (using direct /stories?project_id= endpoint)
-  list: (projectId: string, params?: QueryParams & { sprint_id?: string }) =>
+  list: (projectId: string, params?: QueryParams & { sprint_id?: string; status?: string }) =>
     get<PaginatedResponse<StorySummary>>(`${BASE}`, {
       params: { project_id: projectId, page_size: 500, ...params },
     }),
