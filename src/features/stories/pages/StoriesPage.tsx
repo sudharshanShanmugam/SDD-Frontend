@@ -18,14 +18,8 @@ import {
   Collapse,
 } from '@mui/material';
 import {
-  Add,
-  Close,
-  AutoAwesome,
-  DeleteSweep,
-  ExpandMore,
-  ExpandLess,
-  CheckCircle,
-  Refresh,
+  Add, Close, AutoAwesome, DeleteSweep,
+  ExpandMore, ExpandLess, CheckCircle, Refresh,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -131,6 +125,7 @@ const StoriesPage: React.FC = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editStory, setEditStory] = useState<Story | null>(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [confirmAcceptAllOpen, setConfirmAcceptAllOpen] = useState(false);
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false, message: '', severity: 'success',
   });
@@ -339,13 +334,7 @@ const StoriesPage: React.FC = () => {
                 <Button
                   variant="outlined" size="small"
                   startIcon={<CheckCircle />}
-                  onClick={async () => {
-                    const ids = filtered
-                      .filter(s => s.status !== 'approved' && s.status !== 'rejected')
-                      .map(s => s.id);
-                    await storiesApi.bulkUpdateStatus(ids, 'approved');
-                    queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
-                  }}
+                  onClick={() => setConfirmAcceptAllOpen(true)}
                   sx={{ borderRadius: 2, color: '#10b981', borderColor: '#10b981',
                     '&:hover': { bgcolor: '#f0fdf4', borderColor: '#10b981' } }}
                 >
@@ -561,6 +550,41 @@ const StoriesPage: React.FC = () => {
             sx={{ borderRadius: 2 }}
           >
             Delete All
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Accept All confirmation */}
+      <Dialog open={confirmAcceptAllOpen} onClose={() => setConfirmAcceptAllOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CheckCircle sx={{ color: '#10b981' }} />
+          Accept All Stories?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will mark <strong>
+              {filtered.filter(s => s.status !== 'approved' && s.status !== 'rejected').length} stories
+            </strong> as accepted. Only accepted stories can be added to sprints.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setConfirmAcceptAllOpen(false)} variant="outlined" sx={{ borderRadius: 2 }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              setConfirmAcceptAllOpen(false);
+              const ids = filtered
+                .filter(s => s.status !== 'approved' && s.status !== 'rejected')
+                .map(s => s.id);
+              await storiesApi.bulkUpdateStatus(ids, 'approved');
+              queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
+            }}
+            variant="contained"
+            startIcon={<CheckCircle />}
+            sx={{ borderRadius: 2, bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}
+          >
+            Accept All
           </Button>
         </DialogActions>
       </Dialog>
