@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import {
   MoreVert, Edit, Delete, Visibility, AutoAwesome, Star,
-  CheckCircle, Cancel, Replay,
+  CheckCircle, Cancel,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 
@@ -158,30 +158,20 @@ const StoryCard: React.FC<StoryCardProps> = ({
           </Box>
 
           {/* Accept / Decline buttons */}
-          {onStatusChange && (
+          {onStatusChange && !isSettled && (
             <Stack direction="row" spacing={0.75} onClick={(e) => e.stopPropagation()}>
-              {isSettled ? (
-                <Button size="small" variant="outlined" startIcon={<Replay sx={{ fontSize: 13 }} />}
-                  sx={{ fontSize: '0.68rem', py: 0.25, color: 'text.secondary', borderColor: 'divider' }}
-                  onClick={() => onStatusChange(story.id, 'backlog')}>
-                  Reset
-                </Button>
-              ) : (
-                <>
-                  <Button size="small" variant="outlined" startIcon={<CheckCircle sx={{ fontSize: 13 }} />}
-                    sx={{ fontSize: '0.68rem', py: 0.25, color: '#10b981', borderColor: '#10b981',
-                          '&:hover': { bgcolor: '#f0fdf4', borderColor: '#10b981' } }}
-                    onClick={() => onStatusChange(story.id, 'approved')}>
-                    Accept
-                  </Button>
-                  <Button size="small" variant="outlined" startIcon={<Cancel sx={{ fontSize: 13 }} />}
-                    sx={{ fontSize: '0.68rem', py: 0.25, color: '#ef4444', borderColor: '#ef4444',
-                          '&:hover': { bgcolor: '#fef2f2', borderColor: '#ef4444' } }}
-                    onClick={() => onStatusChange(story.id, 'rejected')}>
-                    Decline
-                  </Button>
-                </>
-              )}
+              <Button size="small" variant="outlined" startIcon={<CheckCircle sx={{ fontSize: 13 }} />}
+                sx={{ fontSize: '0.68rem', py: 0.25, color: '#10b981', borderColor: '#10b981',
+                      '&:hover': { bgcolor: '#f0fdf4', borderColor: '#10b981' } }}
+                onClick={() => onStatusChange(story.id, 'approved')}>
+                Accept
+              </Button>
+              <Button size="small" variant="outlined" startIcon={<Cancel sx={{ fontSize: 13 }} />}
+                sx={{ fontSize: '0.68rem', py: 0.25, color: '#ef4444', borderColor: '#ef4444',
+                      '&:hover': { bgcolor: '#fef2f2', borderColor: '#ef4444' } }}
+                onClick={() => onStatusChange(story.id, 'rejected')}>
+                Decline
+              </Button>
             </Stack>
           )}
         </CardContent>
