@@ -85,7 +85,7 @@ export default function ProjectOverviewPage() {
   const workload: any[] = stats?.workload ?? []
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: 'auto' }}>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <Stack
