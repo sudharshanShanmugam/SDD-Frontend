@@ -15,7 +15,6 @@ import {
   FileText,
   Hash,
   BookOpen,
-  Zap,
   CheckSquare,
   FlaskConical,
   Tag,
@@ -59,7 +58,6 @@ function getNavItems(projectId: string): NavItem[] {
     { label: 'Releases',      path: `${base}/releases`,      icon: <Tag size={16} /> },
     { label: 'Approvals',     path: `${base}/approvals`,     icon: <ShieldCheck size={16} />, divider: true },
     { label: 'AI Workflow',   path: `${base}/ai-workflow`,   icon: <Sparkles size={16} /> },
-    { label: 'AI Prompts',    path: `${base}/ai-prompts`,    icon: <Zap size={16} />, divider: true },
     { label: 'Members',       path: `${base}/members`,       icon: <Users size={16} /> },
   ]
 }

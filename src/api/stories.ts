@@ -74,7 +74,6 @@ interface CreateStoryRequest {
   asA?: string;
   iWant?: string;
   soThat?: string;
-  epicId?: string;
   sprintId?: string;
   assigneeId?: string;
   tags?: string[];

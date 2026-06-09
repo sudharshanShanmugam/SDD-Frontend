@@ -25,7 +25,6 @@ export interface Requirement extends Auditable {
   id: UUID;
   projectId: UUID;
   documentId: Nullable<UUID>;
-  epicId: Nullable<UUID>;
   storyId: Nullable<UUID>;
   identifier: string;             // e.g., "REQ-001"
   title: string;

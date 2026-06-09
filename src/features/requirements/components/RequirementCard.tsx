@@ -52,7 +52,6 @@ export interface Requirement {
   acceptanceCriteria?: string;
   source?:            string;
   chunkId?:           string;
-  epicIds?:           string[];
   storyIds?:          string[];
   tags?:              string[];
   createdAt:          string;

@@ -16,7 +16,6 @@ export type StoryType = 'user_story' | 'bug' | 'spike' | 'chore' | 'task';
 export interface Story extends Auditable {
   id: UUID;
   projectId: UUID;
-  epicId: Nullable<UUID>;
   sprintId: Nullable<UUID>;
   identifier: string;             // e.g., "STORY-001"
   title: string;
@@ -58,7 +57,6 @@ export interface StorySummary {
   priority: Priority;
   storyPoints: Nullable<number>;
   assignee: Nullable<UserSummary>;
-  epicId: Nullable<UUID>;
   /** Sprint assignment — populated by the backend serializer */
   sprintId: Nullable<UUID>;
 }

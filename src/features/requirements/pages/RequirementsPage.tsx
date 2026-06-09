@@ -332,11 +332,11 @@ const RequirementDetailDrawer: React.FC<{
 /* ─── Single group card (contains N requirement rows) ───────────── */
 
 const GroupCard: React.FC<{
-  epicId: string;
+  groupLabel: string;
   topic: string;
   reqs: Requirement[];
   onOpen: (req: Requirement) => void;
-}> = ({ epicId, topic, reqs, onOpen }) => {
+}> = ({ groupLabel, topic, reqs, onOpen }) => {
   const approved     = reqs.filter((r) => r.status === 'approved').length;
   const highestPri   = reqs.some((r) => r.priority === 'critical') ? 'critical'
     : reqs.some((r) => r.priority === 'high') ? 'high'
@@ -357,7 +357,7 @@ const GroupCard: React.FC<{
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.75, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#6366f1' + '08' }}>
         <Box sx={{ px: 0.9, py: 0.25, borderRadius: 0.75, bgcolor: '#6366f1', color: 'white', fontSize: '0.65rem', fontWeight: 800, fontFamily: 'monospace', flexShrink: 0 }}>
-          {epicId}
+          {groupLabel}
         </Box>
         <Typography variant="body2" fontWeight={800} sx={{ flex: 1, fontSize: '0.875rem' }}>{topic}</Typography>
         <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>{approved}/{reqs.length} accepted</Typography>
@@ -444,7 +444,7 @@ const GroupedRequirementCards: React.FC<GroupedCardsProps> = ({
             {[...groupMap.entries()].map(([topic, { reqs }], idx) => (
               <GroupCard
                 key={topic}
-                epicId={`E${idx + 1}`}
+                groupLabel={`G${idx + 1}`}
                 topic={topic}
                 reqs={reqs}
                 onOpen={(req) => setOpenReq(req)}

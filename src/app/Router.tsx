@@ -28,7 +28,6 @@ const QADashboardPage      = lazy(() => import('./pages/QADashboardPage'))
 const ReleasesPage         = lazy(() => import('./pages/ReleasesPage'))
 const ApprovalsPage        = lazy(() => import('./pages/ApprovalsPage'))
 const AIWorkflowPage       = lazy(() => import('./pages/AIWorkflowPage'))
-const AIPromptsPage        = lazy(() => import('@features/ai/pages/AIPromptsPage'))
 const ProjectMembersPage   = lazy(() => import('./pages/ProjectMembersPage'))
 
 // User / org pages
@@ -261,13 +260,6 @@ export function AppRouter(): React.JSX.Element {
           <Route path="ai-workflow" element={
             <React.Suspense fallback={<PageSpinner />}>
               <AIWorkflowPage />
-            </React.Suspense>
-          } />
-          <Route path="ai-prompts" element={
-            <React.Suspense fallback={<PageSpinner />}>
-              <RoleGuard roles={['super_admin', 'org_admin', 'tech_lead']}>
-                <AIPromptsPage />
-              </RoleGuard>
             </React.Suspense>
           } />
           <Route path="members" element={

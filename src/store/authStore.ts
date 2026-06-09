@@ -43,7 +43,7 @@ export const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
 export const ROLE_NAV_ACCESS: Record<AppRole, string[]> = {
   super_admin:      ['*'],
   org_admin:        ['*'],
-  project_manager:  ['dashboard','workspaces','documents','requirements','stories','sprints','tasks','qa','releases','approvals','ai-workflow','ai-prompts'],
+  project_manager:  ['dashboard','workspaces','documents','requirements','stories','sprints','tasks','qa','releases','approvals','ai-workflow'],
   business_analyst: ['dashboard','workspaces','documents','requirements','stories','sprints','tasks','qa','releases','approvals','ai-workflow'],
   tech_lead:        ['dashboard','workspaces','documents','requirements','stories','sprints','tasks','qa','releases','ai-workflow'],
   developer:        ['dashboard','workspaces','sprints','tasks'],

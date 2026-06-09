@@ -99,9 +99,6 @@ export const aiApi = {
   generateRequirements: (projectId: string, context: AIContext) =>
     post<AIRequest>(`/projects/${projectId}/ai/generate-requirements`, { context }),
 
-  generateStories: (epicId: string, context: AIContext) =>
-    post<AIRequest>(`/epics/${epicId}/ai/generate-stories`, { context }),
-
   generateAcceptanceCriteria: (storyId: string) =>
     post<AIRequest>(`/stories/${storyId}/ai/generate-ac`),
 

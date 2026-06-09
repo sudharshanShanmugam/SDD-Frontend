@@ -27,7 +27,6 @@ import {
   Tag,
   ShieldCheck,
   Sparkles,
-  Code2,
   Bell,
   Users,
   Settings,
@@ -273,11 +272,6 @@ export default function Sidebar({ collapsed }: SidebarProps): React.JSX.Element 
             href: `/projects/${effectiveProjectId}/ai-workflow`,
             icon: <Sparkles />,
             permission: 'ai:use',
-          }] : []),
-          ...(canAccess('ai-prompts') ? [{
-            label: 'AI Prompts',
-            href: `/projects/${effectiveProjectId}/ai-prompts`,
-            icon: <Code2 />,
           }] : []),
           {
             label: 'Members',

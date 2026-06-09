@@ -1,519 +1,403 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  Grid,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  IconButton,
-  Chip,
-  CircularProgress,
-  Snackbar,
-  Alert,
-  Tooltip,
-  Collapse,
+  Box, Typography, Button, Dialog, DialogTitle, DialogContent,
+  DialogContentText, DialogActions, IconButton, CircularProgress,
+  Snackbar, Alert, Tooltip, InputAdornment, TextField, Stack,
 } from '@mui/material';
 import {
-  Add, Close, AutoAwesome, DeleteSweep,
-  ExpandMore, ExpandLess, CheckCircle, Refresh,
+  Add, Close, AutoAwesome, DeleteSweep, CheckCircle,
+  Refresh, Search, BookmarkBorder,
 } from '@mui/icons-material';
-import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { storiesApi } from '@/api';
-import StoryCard, { Story } from '../components/StoryCard';
-import StoryFilters, { StoryFilterState } from '../components/StoryFilters';
+import StoryRow, { Story, StoryStatus, STATUS_CONFIG, PRIORITY_CONFIG } from '../components/StoryCard';
 import { StoryDetailPanel } from '../components/StoryDetailPanel';
 import StoryEditor from '../components/StoryEditor';
 
-const initialFilters: StoryFilterState = {
-  search: '',
-  statuses: [],
-  priorities: [],
-};
+const ALL_STATUSES: StoryStatus[] = ['in_progress', 'review', 'ready', 'backlog', 'approved', 'done', 'rejected'];
+const PRIORITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
-/* ── Epic group section ────────────────────────────────────────────────────── */
-interface EpicGroupProps {
-  epicId: string;
-  topic: string;
-  stories: Story[];
-  onView: (s: Story) => void;
-  onEdit: (s: Story) => void;
-  onDelete: (id: string) => void;
-  onStatusChange: (id: string, status: any) => void;
-}
-
-const EpicGroup: React.FC<EpicGroupProps> = ({ epicId, topic, stories, onView, onEdit, onDelete, onStatusChange }) => {
-  const [open, setOpen] = useState(true);
-
+/* ── helpers ─────────────────────────────────────────────────────────────── */
+function StatPill({ label, value, color }: { label: string; value: string | number; color?: string | undefined }) {
   return (
-    <Box sx={{ mb: 2 }}>
-      {/* Group header */}
-      <Box
-        onClick={() => setOpen(!open)}
-        sx={{
-          display: 'flex', alignItems: 'center', gap: 1.5,
-          px: 2, py: 1.25, borderRadius: 2, cursor: 'pointer',
-          bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider',
-          mb: open ? 1.5 : 0,
-          '&:hover': { bgcolor: 'action.selected' },
-          transition: 'background-color 0.15s',
-        }}
-      >
-        <IconButton size="small" sx={{ p: 0 }}>
-          {open ? <ExpandLess sx={{ fontSize: 18 }} /> : <ExpandMore sx={{ fontSize: 18 }} />}
-        </IconButton>
-        <Box
-          sx={{
-            px: 0.9, py: 0.2, borderRadius: 1,
-            bgcolor: '#6366f1', color: 'white',
-            fontSize: '0.65rem', fontWeight: 800, fontFamily: 'monospace',
-            flexShrink: 0,
-          }}
-        >
-          {epicId}
-        </Box>
-        <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>
-          {topic}
-        </Typography>
-        <Chip
-          label={`${stories.length} stor${stories.length === 1 ? 'y' : 'ies'}`}
-          size="small"
-          sx={{ height: 20, fontSize: '0.65rem', bgcolor: '#6366f1' + '1a', color: '#6366f1' }}
-        />
-        <Typography variant="caption" color="text.secondary">
-          {stories.reduce((a, s) => a + (s.points || 0), 0)} pts total
-        </Typography>
-      </Box>
-
-      <Collapse in={open}>
-        <Grid container spacing={2} sx={{ pl: 1 }}>
-          {stories.map((story, index) => (
-            <Grid item xs={12} sm={6} lg={4} key={story.id}>
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.03 }}
-              >
-                <StoryCard
-                  story={story}
-                  onView={onView}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onStatusChange={onStatusChange}
-                />
-              </motion.div>
-            </Grid>
-          ))}
-        </Grid>
-      </Collapse>
+    <Box sx={{ textAlign: 'center', px: 2, py: 1 }}>
+      <Typography variant="h6" fontWeight={800} sx={{ color: color ?? 'text.primary', lineHeight: 1.1 }}>{value}</Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>{label}</Typography>
     </Box>
   );
-};
+}
 
-/* ── Main page ─────────────────────────────────────────────────────────────── */
+/* ── table header ────────────────────────────────────────────────────────── */
+function TableHeader() {
+  return (
+    <Box sx={{
+      display: 'grid',
+      gridTemplateColumns: '4px 80px 1fr 100px 52px 32px 80px 32px',
+      gap: 2, px: 2, py: 0.75,
+      bgcolor: 'action.hover',
+      borderBottom: '1px solid', borderColor: 'divider',
+    }}>
+      <Box />
+      <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ID</Typography>
+      <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Story</Typography>
+      <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</Typography>
+      <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Pts</Typography>
+      <Box />
+      <Box />
+      <Box />
+    </Box>
+  );
+}
+
+/* ── main page ───────────────────────────────────────────────────────────── */
 const StoriesPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const queryClient = useQueryClient();
 
-  const [filters, setFilters] = useState<StoryFilterState>(initialFilters);
-  const [detailStoryId, setDetailStoryId] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editStory, setEditStory] = useState<Story | null>(null);
+  const [search, setSearch]                     = useState('');
+  const [activeStatus, setActiveStatus]         = useState<StoryStatus | 'all'>('all');
+  const [activePriorities, setActivePriorities] = useState<string[]>([]);
+  const [detailStoryId, setDetailStoryId]       = useState<string | null>(null);
+  const [formOpen, setFormOpen]                 = useState(false);
+  const [editStory, setEditStory]               = useState<Story | null>(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
-  const [confirmAcceptAllOpen, setConfirmAcceptAllOpen] = useState(false);
+  const [confirmAcceptOpen, setConfirmAcceptOpen] = useState(false);
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false, message: '', severity: 'success',
   });
 
-  // ── Fetch stories ────────────────────────────────────────────────────────────
+  /* ── data ─────────────────────────────────────────────────────────────── */
   const { data, isLoading } = useQuery({
     queryKey: ['stories', projectId],
     queryFn: () => storiesApi.list(projectId!),
     enabled: !!projectId,
   });
   const stories: Story[] = (data?.data ?? []) as unknown as Story[];
-  const storyCount = stories.length;
 
-  // ── Mutations ────────────────────────────────────────────────────────────────
   const { mutateAsync: createStory } = useMutation({
-    mutationFn: (storyData: Partial<Story>) => storiesApi.create(projectId!, storyData as never),
+    mutationFn: (d: Partial<Story>) => storiesApi.create(projectId!, d as never),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stories', projectId] }),
   });
-
   const { mutate: patchStory } = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Story> }) =>
-      storiesApi.patch(id, updates as never),
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Story> }) => storiesApi.patch(id, updates as never),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stories', projectId] }),
   });
-
   const { mutate: deleteStory } = useMutation({
     mutationFn: (id: string) => storiesApi.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stories', projectId] }),
   });
-
   const { mutate: generateStories, isPending: generating } = useMutation({
     mutationFn: () => storiesApi.generateFromRequirements(projectId!),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
-      const count = res?.count ?? 0;
-      const reqs  = res?.requirements_used ?? '?';
-      setSnack({
-        open: true,
-        message: `✅ Generated ${count} user stories from ${reqs} requirements`,
-        severity: 'success',
-      });
+      setSnack({ open: true, severity: 'success', message: `Generated ${res?.count ?? 0} stories` });
     },
     onError: (err: any) => {
       queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
       const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout');
-      const detail = isTimeout
-        ? 'Request timed out — stories may still be generating. Refresh in a moment.'
-        : (err?.response?.data?.detail ?? 'Generation failed. Please try again.');
-      setSnack({ open: true, message: `⚠️ ${detail}`, severity: 'error' });
+      setSnack({ open: true, severity: 'error', message: isTimeout ? 'Timed out — refresh in a moment.' : err?.response?.data?.detail ?? 'Generation failed.' });
     },
   });
-
-  const { mutate: clearAndRegenerate, isPending: clearing } = useMutation({
-    mutationFn: async () => {
-      await storiesApi.clearAll(projectId!);
-      return storiesApi.generateFromRequirements(projectId!);
-    },
-    onSuccess: (res: any) => {
+  const { mutate: clearAll, isPending: clearing } = useMutation({
+    mutationFn: () => storiesApi.clearAll(projectId!),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
-      const count = res?.count ?? 0;
-      const reqs  = res?.requirements_used ?? '?';
-      setSnack({
-        open: true,
-        message: `✅ Cleared old stories and generated ${count} new user stories from ${reqs} requirements`,
-        severity: 'success',
-      });
-    },
-    onError: (err: any) => {
-      queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
-      const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout');
-      const detail = isTimeout
-        ? 'Request timed out — stories may still be generating. Refresh in a moment.'
-        : (err?.response?.data?.detail ?? 'Regeneration failed. Please try again.');
-      setSnack({ open: true, message: `⚠️ ${detail}`, severity: 'error' });
+      setConfirmClearOpen(false);
     },
   });
 
   const busy = generating || clearing;
 
-  // ── Filtering ────────────────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    return stories.filter((s) => {
-      if (filters.search && !s.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
-      if (filters.statuses.length && !filters.statuses.includes(s.status)) return false;
-      if (filters.priorities.length && !filters.priorities.includes(s.priority)) return false;
+  /* ── derived ──────────────────────────────────────────────────────────── */
+  const countByStatus = useMemo(() => {
+    const m: Partial<Record<StoryStatus, number>> = {};
+    stories.forEach((s) => { m[s.status] = (m[s.status] ?? 0) + 1; });
+    return m;
+  }, [stories]);
+
+  const filtered = useMemo(() => stories
+    .filter((s) => {
+      if (activeStatus !== 'all' && s.status !== activeStatus) return false;
+      if (activePriorities.length && !activePriorities.includes(s.priority)) return false;
+      if (search && !s.title.toLowerCase().includes(search.toLowerCase()) &&
+          !s.storyId.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
-    });
-  }, [stories, filters]);
+    })
+    .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2)),
+  [stories, activeStatus, activePriorities, search]);
 
-  // ── Epic grouping ─────────────────────────────────────────────────────────────
-  const { epicGroups, ungrouped } = useMemo(() => {
-    const groups = new Map<string, { topic: string; stories: Story[] }>();
-    const plain: Story[] = [];
+  const totalPts     = stories.reduce((a, s) => a + (s.points ?? 0), 0);
+  const pendingCount = stories.filter((s) => s.status !== 'approved' && s.status !== 'rejected').length;
+  const acceptedCount = stories.filter((s) => s.status === 'approved').length;
 
-    for (const s of filtered) {
-      const epicMatch = s.storyId?.match(/^(E\d+)-/);
-      if (epicMatch) {
-        const epicId: string = epicMatch[1] ?? '';
-        if (!epicId) { plain.push(s); continue; }
-        const topicTag = (s.tags ?? []).find((t: string) => t.startsWith('epic-topic:'));
-        const topic: string = topicTag ? topicTag.slice(11) : epicId;
-        if (!groups.has(epicId)) groups.set(epicId, { topic, stories: [] });
-        groups.get(epicId)!.stories.push(s);
-      } else {
-        plain.push(s);
-      }
-    }
+  const togglePriority = (p: string) =>
+    setActivePriorities((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
 
-    // Sort epic IDs numerically: E1, E2, E3...
-    const sorted = new Map(
-      [...groups.entries()].sort((a, b) => {
-        const na = parseInt(a[0].slice(1), 10);
-        const nb = parseInt(b[0].slice(1), 10);
-        return na - nb;
-      })
-    );
-
-    return { epicGroups: sorted, ungrouped: plain };
-  }, [filtered]);
-
-  const hasEpics = epicGroups.size > 0;
-  const totalPoints = filtered.reduce((a, s) => a + (s.points || 0), 0);
-
-  const handleUpdate = async (id: string, updates: Partial<Story>) => {
-    patchStory({ id, updates });
-  };
-
-  if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  if (isLoading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+      <CircularProgress />
+    </Box>
+  );
 
   return (
-    <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+    <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: 'background.default' }}>
 
-      {/* Left: Filters panel */}
-      <Box sx={{
-        width: 240, flexShrink: 0, borderRight: '1px solid',
-        borderColor: 'divider', p: 2, overflowY: 'auto',
-      }}>
-        <StoryFilters
-          filters={filters}
-          onChange={setFilters}
-          totalCount={stories.length}
-          filteredCount={filtered.length}
-        />
-      </Box>
+      {/* ══ Header ══════════════════════════════════════════════════════════ */}
+      <Box sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
 
-      {/* Right: Main content */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-        {/* Header */}
-        <Box sx={{
-          p: 2, borderBottom: '1px solid', borderColor: 'divider',
-          display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', flexWrap: 'wrap', gap: 1,
-        }}>
-          <Box>
-            <Typography variant="h5" fontWeight={700}>User Stories</Typography>
-            <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-              <Chip label={`${filtered.length} stories`} size="small" />
-              {hasEpics && (
-                <Chip label={`${epicGroups.size} epic${epicGroups.size !== 1 ? 's' : ''}`} size="small" color="secondary" />
-              )}
-              {totalPoints > 0 && (
-                <Chip label={`${totalPoints} total points`} size="small" color="primary" />
-              )}
-            </Box>
-          </Box>
-
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {/* Delete All */}
-            {storyCount > 0 && (
-              <Tooltip title="Delete all stories">
-                <Button
-                  variant="outlined" size="small" color="error"
-                  startIcon={<DeleteSweep />}
-                  onClick={() => setConfirmClearOpen(true)}
-                  disabled={busy}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Delete All
-                </Button>
-              </Tooltip>
-            )}
-
-            {/* Regenerate */}
-            <Tooltip title={storyCount > 0 ? 'Regenerate stories from requirements' : 'Generate stories from requirements'}>
-              <Button
-                variant="outlined" color="secondary" size="small"
-                startIcon={busy ? <CircularProgress size={14} color="inherit" /> : (storyCount > 0 ? <Refresh /> : <AutoAwesome />)}
-                onClick={() => generateStories()}
-                disabled={busy}
-                sx={{ borderRadius: 2, borderColor: 'secondary.main' }}
-              >
-                {generating ? 'Generating…' : storyCount > 0 ? 'Regenerate' : 'Generate'}
-              </Button>
-            </Tooltip>
-
-            {/* Accept All */}
-            {filtered.some(s => s.status !== 'approved' && s.status !== 'rejected') && (
-              <Tooltip title="Accept all visible stories">
-                <Button
-                  variant="outlined" size="small"
-                  startIcon={<CheckCircle />}
-                  onClick={() => setConfirmAcceptAllOpen(true)}
-                  sx={{ borderRadius: 2, color: '#10b981', borderColor: '#10b981',
-                    '&:hover': { bgcolor: '#f0fdf4', borderColor: '#10b981' } }}
-                >
-                  Accept All
-                </Button>
-              </Tooltip>
-            )}
-
-            {/* Add */}
-            <Button
-              variant="contained" size="small"
-              startIcon={<Add />}
-              onClick={() => { setEditStory(null); setFormOpen(true); }}
-              sx={{ borderRadius: 2 }}
-            >
-              Add Story
-            </Button>
-          </Box>
-        </Box>
-
-        {/* Generating / clearing banner */}
-        {busy && (
-          <Box sx={{
-            display: 'flex', alignItems: 'center', gap: 2, mx: 2, mt: 2, p: 2,
-            bgcolor: 'secondary.main', color: 'white', borderRadius: 2,
-          }}>
-            <CircularProgress size={20} color="inherit" />
-            <Typography variant="body2" fontWeight={600}>
-              {clearing
-                ? 'Clearing old stories and regenerating from requirements…'
-                : 'AI is analysing your requirements and writing user stories…'}
-            </Typography>
-          </Box>
-        )}
-
-        {/* Empty state */}
-        {storyCount === 0 && !busy && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+        {/* Top bar */}
+        <Stack direction="row" alignItems="center" sx={{ px: 3, py: 1.5, gap: 2 }}>
+          {/* Icon + title */}
+          <Stack direction="row" alignItems="center" spacing={1.25}>
             <Box sx={{
-              textAlign: 'center', py: 8, px: 4,
-              border: '2px dashed', borderColor: 'divider',
-              borderRadius: 3, m: 3, bgcolor: 'background.paper',
+              width: 32, height: 32, borderRadius: 1.5,
+              bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <AutoAwesome sx={{ fontSize: 56, color: 'secondary.main', mb: 2, opacity: 0.7 }} />
-              <Typography variant="h5" fontWeight={700} gutterBottom>
-                No user stories yet
+              <BookmarkBorder sx={{ fontSize: 17, color: '#fff' }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={800} letterSpacing="-0.3px" lineHeight={1.2}>
+                User Stories
               </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 480, mx: 'auto' }}>
-                User stories describe features from a user's perspective. Let AI automatically
-                generate them from your requirements, or add them manually.
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  size="large"
-                  startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <AutoAwesome />}
-                  onClick={() => generateStories()}
-                  disabled={busy}
-                  sx={{ borderRadius: 2, px: 4 }}
-                >
-                  {generating ? 'Generating Stories…' : 'Generate Stories from Requirements'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  startIcon={<Add />}
-                  onClick={() => { setEditStory(null); setFormOpen(true); }}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Create Manually
-                </Button>
-              </Box>
-              <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 2 }}>
-                Tip: Group your requirements by topic first for epic-organised stories (E1-US1, E1-US2…)
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                {stories.length} stories · {totalPts} points
               </Typography>
             </Box>
-          </motion.div>
-        )}
+          </Stack>
 
-        {/* Story grid — grouped or flat */}
-        {filtered.length > 0 && (
-          <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
-            {hasEpics ? (
-              <>
-                {/* Epic-grouped stories */}
-                {[...epicGroups.entries()].map(([epicId, { topic, stories: epicStories }]) => (
-                  <EpicGroup
-                    key={epicId}
-                    epicId={epicId}
-                    topic={topic}
-                    stories={epicStories}
-                    onView={(s) => setDetailStoryId(s.id)}
-                    onEdit={(s) => { setEditStory(s); setFormOpen(true); }}
-                    onDelete={(id) => deleteStory(id)}
-                    onStatusChange={(id, status) => handleUpdate(id, { status })}
-                  />
-                ))}
+          {/* Stats */}
+          <Stack direction="row" divider={<Box sx={{ width: 1, bgcolor: 'divider', alignSelf: 'stretch', my: 0.5 }} />}
+            sx={{ ml: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+            <StatPill label="Total"    value={stories.length} />
+            <StatPill label="Pending"  value={pendingCount}  color={pendingCount  > 0 ? '#f59e0b' : undefined} />
+            <StatPill label="Accepted" value={acceptedCount} color={acceptedCount > 0 ? '#10b981' : undefined} />
+            <StatPill label="Points"   value={totalPts} />
+          </Stack>
 
-                {/* Ungrouped stories at the bottom */}
-                {ungrouped.length > 0 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'block', mb: 1, pl: 0.5 }}>
-                      OTHER STORIES
-                    </Typography>
-                    <Grid container spacing={2}>
-                      {ungrouped.map((story, index) => (
-                        <Grid item xs={12} sm={6} lg={4} key={story.id}>
-                          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}>
-                            <StoryCard
-                              story={story}
-                              onView={(s) => setDetailStoryId(s.id)}
-                              onEdit={(s) => { setEditStory(s); setFormOpen(true); }}
-                              onDelete={(id) => deleteStory(id)}
-                              onStatusChange={(id, status) => handleUpdate(id, { status })}
-                            />
-                          </motion.div>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Box>
-                )}
-              </>
-            ) : (
-              /* Flat grid when no epics */
-              <Grid container spacing={2}>
-                {filtered.map((story, index) => (
-                  <Grid item xs={12} sm={6} lg={4} key={story.id}>
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                    >
-                      <StoryCard
-                        story={story}
-                        onView={(s) => setDetailStoryId(s.id)}
-                        onEdit={(s) => { setEditStory(s); setFormOpen(true); }}
-                        onDelete={(id) => deleteStory(id)}
-                        onStatusChange={(id, status) => handleUpdate(id, { status })}
-                      />
-                    </motion.div>
-                  </Grid>
-                ))}
-              </Grid>
+          <Box sx={{ flex: 1 }} />
+
+          {/* Actions */}
+          <Stack direction="row" spacing={1}>
+            {pendingCount > 0 && (
+              <Button size="small" variant="outlined" startIcon={<CheckCircle sx={{ fontSize: 14 }} />}
+                onClick={() => setConfirmAcceptOpen(true)}
+                sx={{ textTransform: 'none', borderRadius: 2, fontSize: '0.78rem', height: 32,
+                  color: '#10b981', borderColor: '#10b981', '&:hover': { bgcolor: '#f0fdf4' } }}>
+                Accept All
+              </Button>
             )}
+            <Button size="small" variant="outlined" color="secondary"
+              startIcon={busy
+                ? <CircularProgress size={12} color="inherit" />
+                : stories.length > 0 ? <Refresh sx={{ fontSize: 14 }} /> : <AutoAwesome sx={{ fontSize: 14 }} />}
+              onClick={() => generateStories()} disabled={busy}
+              sx={{ textTransform: 'none', borderRadius: 2, fontSize: '0.78rem', height: 32 }}>
+              {generating ? 'Generating…' : stories.length > 0 ? 'Regenerate' : 'Generate'}
+            </Button>
+            {stories.length > 0 && (
+              <Tooltip title="Delete all stories">
+                <IconButton size="small" onClick={() => setConfirmClearOpen(true)} disabled={busy}
+                  sx={{ color: 'error.main', border: '1px solid', borderColor: 'error.light', borderRadius: 1.5, width: 32, height: 32 }}>
+                  <DeleteSweep sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Button size="small" variant="contained" startIcon={<Add sx={{ fontSize: 15 }} />}
+              onClick={() => { setEditStory(null); setFormOpen(true); }}
+              sx={{ textTransform: 'none', borderRadius: 2, fontSize: '0.78rem', fontWeight: 700, height: 32, px: 2 }}>
+              New Story
+            </Button>
+          </Stack>
+        </Stack>
+
+        {/* Filter strip */}
+        <Stack direction="row" alignItems="stretch" sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
+          {/* Search */}
+          <Box sx={{ px: 2, display: 'flex', alignItems: 'center', borderRight: '1px solid', borderColor: 'divider' }}>
+            <TextField size="small" placeholder="Search…" value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{
+                width: 180,
+                '& .MuiOutlinedInput-root': { fontSize: '0.8rem', borderRadius: 1.5 },
+                '& fieldset': { border: 'none' },
+              }}
+              slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 15, color: 'text.disabled' }} /></InputAdornment> } }}
+            />
+          </Box>
+
+          {/* Status tabs */}
+          <Stack direction="row" sx={{ flex: 1, overflowX: 'auto' }}>
+            {/* All */}
+            <Box onClick={() => setActiveStatus('all')}
+              sx={{
+                px: 2.5, display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer',
+                borderBottom: '2px solid', borderBottomColor: activeStatus === 'all' ? 'primary.main' : 'transparent',
+                color: activeStatus === 'all' ? 'primary.main' : 'text.secondary',
+                fontWeight: activeStatus === 'all' ? 700 : 500, fontSize: '0.8rem',
+                whiteSpace: 'nowrap', transition: 'color 0.1s',
+                '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+              }}>
+              <Typography variant="body2" fontWeight="inherit" fontSize="inherit">All</Typography>
+              <Box sx={{ px: 0.75, borderRadius: 10, bgcolor: activeStatus === 'all' ? 'primary.main' : 'action.selected', minWidth: 20, textAlign: 'center' }}>
+                <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, color: activeStatus === 'all' ? '#fff' : 'text.secondary', lineHeight: 1.6 }}>
+                  {stories.length}
+                </Typography>
+              </Box>
+            </Box>
+
+            {ALL_STATUSES.map((st) => {
+              const cfg   = STATUS_CONFIG[st];
+              const count = countByStatus[st] ?? 0;
+              const active = activeStatus === st;
+              return (
+                <Box key={st} onClick={() => setActiveStatus(active ? 'all' : st)}
+                  sx={{
+                    px: 2.5, display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer',
+                    borderBottom: '2px solid', borderBottomColor: active ? cfg.color : 'transparent',
+                    color: active ? cfg.color : 'text.secondary',
+                    fontWeight: active ? 700 : 500, fontSize: '0.8rem',
+                    whiteSpace: 'nowrap', transition: 'color 0.1s',
+                    '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                    opacity: count === 0 ? 0.4 : 1,
+                  }}>
+                  <Typography variant="body2" fontWeight="inherit" fontSize="inherit">{cfg.label}</Typography>
+                  {count > 0 && (
+                    <Box sx={{ px: 0.75, borderRadius: 10, bgcolor: active ? cfg.color : 'action.selected', minWidth: 20, textAlign: 'center' }}>
+                      <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, color: active ? '#fff' : 'text.secondary', lineHeight: 1.6 }}>
+                        {count}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Stack>
+
+          {/* Priority dots */}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 2, borderLeft: '1px solid', borderColor: 'divider' }}>
+            {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => {
+              const active = activePriorities.includes(key);
+              return (
+                <Tooltip key={key} title={cfg.label}>
+                  <Box onClick={() => togglePriority(key)} sx={{
+                    width: 10, height: 10, borderRadius: '50%', cursor: 'pointer',
+                    bgcolor: cfg.color, opacity: active ? 1 : 0.2,
+                    outline: active ? `2px solid ${cfg.color}` : 'none', outlineOffset: 2,
+                    transform: active ? 'scale(1.3)' : 'scale(1)', transition: 'all 0.15s',
+                    '&:hover': { opacity: 0.75, transform: 'scale(1.2)' },
+                  }} />
+                </Tooltip>
+              );
+            })}
+            {(search || activePriorities.length > 0) && (
+              <Tooltip title="Clear filters">
+                <IconButton size="small" onClick={() => { setSearch(''); setActivePriorities([]); }}
+                  sx={{ p: 0.3, color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                  <Close sx={{ fontSize: 13 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+        </Stack>
+      </Box>
+
+      {/* ── Generating banner ─────────────────────────────────────────────── */}
+      {busy && (
+        <Stack direction="row" spacing={1.5} alignItems="center"
+          sx={{ mx: 3, mt: 1.5, px: 2.5, py: 1.25, bgcolor: 'secondary.main', color: '#fff', borderRadius: 2, flexShrink: 0 }}>
+          <CircularProgress size={15} color="inherit" thickness={4} />
+          <Typography variant="body2" fontWeight={600} fontSize="0.82rem">
+            {clearing ? 'Deleting stories…' : 'AI is generating user stories from your requirements…'}
+          </Typography>
+        </Stack>
+      )}
+
+      {/* ── Content ───────────────────────────────────────────────────────── */}
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2 }}>
+
+        {/* Empty — no stories */}
+        {stories.length === 0 && !busy && (
+          <Box sx={{
+            height: '100%', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 2,
+          }}>
+            <Box sx={{ width: 64, height: 64, borderRadius: 3, bgcolor: 'primary.main', opacity: 0.08 }} />
+            <BookmarkBorder sx={{ fontSize: 36, color: 'primary.main', mt: -9 }} />
+            <Box>
+              <Typography variant="h6" fontWeight={800}>No user stories yet</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 380, mx: 'auto' }}>
+                Generate from requirements with AI or add them manually.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1.5} mt={1}>
+              <Button variant="contained" color="secondary" startIcon={<AutoAwesome />}
+                onClick={() => generateStories()}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>
+                Generate from Requirements
+              </Button>
+              <Button variant="outlined" startIcon={<Add />}
+                onClick={() => { setEditStory(null); setFormOpen(true); }}
+                sx={{ borderRadius: 2, textTransform: 'none' }}>
+                Add Manually
+              </Button>
+            </Stack>
           </Box>
         )}
 
-        {/* No results after filtering */}
-        {storyCount > 0 && filtered.length === 0 && !busy && (
+        {/* No filter results */}
+        {stories.length > 0 && filtered.length === 0 && !busy && (
           <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography variant="body1" color="text.secondary">
-              No stories match your filters
-            </Typography>
+            <Typography color="text.secondary">No stories match your filters.</Typography>
+            <Button size="small" onClick={() => { setSearch(''); setActiveStatus('all'); setActivePriorities([]); }}
+              sx={{ mt: 1, textTransform: 'none' }}>Reset filters</Button>
+          </Box>
+        )}
+
+        {/* Table */}
+        {filtered.length > 0 && (
+          <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
+            <TableHeader />
+            {filtered.map((story) => (
+              <StoryRow
+                key={story.id}
+                story={story}
+                onView={(s) => setDetailStoryId(s.id)}
+                onEdit={(s) => { setEditStory(s); setFormOpen(true); }}
+                onDelete={(id) => deleteStory(id)}
+                onStatusChange={(id, st) => patchStory({ id, updates: { status: st } })}
+              />
+            ))}
+            {/* Footer */}
+            <Box sx={{ px: 2, py: 1, bgcolor: 'action.hover', borderTop: '1px solid', borderColor: 'divider',
+              display: 'grid', gridTemplateColumns: '4px 80px 1fr 100px 52px 32px 80px 32px', gap: 2, alignItems: 'center' }}>
+              <Box /><Box />
+              <Typography variant="caption" color="text.disabled">{filtered.length} {filtered.length === 1 ? 'story' : 'stories'}</Typography>
+              <Box />
+              <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="center">
+                {filtered.reduce((a, s) => a + (s.points ?? 0), 0)}p
+              </Typography>
+              <Box /><Box /><Box />
+            </Box>
           </Box>
         )}
       </Box>
 
-      {/* Story detail panel */}
-      <StoryDetailPanel
-        storyId={detailStoryId}
-        onClose={() => setDetailStoryId(null)}
-      />
+      {/* ── Detail panel ─────────────────────────────────────────────────── */}
+      <StoryDetailPanel storyId={detailStoryId} onClose={() => setDetailStoryId(null)} />
 
-      {/* Create / edit story dialog */}
+      {/* ── Dialogs ──────────────────────────────────────────────────────── */}
       <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {editStory ? `Edit ${editStory.storyId}` : 'Create Story'}
-          <IconButton onClick={() => setFormOpen(false)}><Close /></IconButton>
+          {editStory ? `Edit ${editStory.storyId}` : 'New Story'}
+          <IconButton size="small" onClick={() => setFormOpen(false)}><Close /></IconButton>
         </DialogTitle>
         <DialogContent dividers sx={{ pt: 2 }}>
           <StoryEditor
             story={editStory}
-            onSave={async (storyData) => {
-              if (editStory) {
-                await handleUpdate(editStory.id, storyData);
-              } else {
-                await createStory(storyData);
-              }
+            onSave={async (d) => {
+              if (editStory) patchStory({ id: editStory.id, updates: d });
+              else await createStory(d);
               setFormOpen(false);
             }}
             onCancel={() => setFormOpen(false)}
@@ -521,88 +405,49 @@ const StoriesPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Clear & Regenerate dialog */}
       <Dialog open={confirmClearOpen} onClose={() => setConfirmClearOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <DeleteSweep color="error" />
-          Delete All Stories?
-        </DialogTitle>
+        <DialogTitle fontWeight={700}>Delete all stories?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This will <strong>permanently delete all {storyCount} existing
-            {storyCount !== 1 ? ' stories' : ' story'}</strong> for this project.
-            This action cannot be undone.
+            Permanently deletes all <strong>{stories.length} stories</strong>. This cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={() => setConfirmClearOpen(false)} variant="outlined" sx={{ borderRadius: 2 }}>
-            Cancel
-          </Button>
-          <Button
-            onClick={async () => {
-              setConfirmClearOpen(false);
-              await storiesApi.clearAll(projectId!);
-              queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
-            }}
-            variant="contained"
-            color="error"
-            startIcon={<DeleteSweep />}
-            sx={{ borderRadius: 2 }}
-          >
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setConfirmClearOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={() => clearAll()} variant="contained" color="error"
+            startIcon={clearing ? <CircularProgress size={13} color="inherit" /> : <DeleteSweep />}
+            disabled={clearing} sx={{ textTransform: 'none' }}>
             Delete All
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Accept All confirmation */}
-      <Dialog open={confirmAcceptAllOpen} onClose={() => setConfirmAcceptAllOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CheckCircle sx={{ color: '#10b981' }} />
-          Accept All Stories?
-        </DialogTitle>
+      <Dialog open={confirmAcceptOpen} onClose={() => setConfirmAcceptOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle fontWeight={700}>Accept all pending stories?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This will mark <strong>
-              {filtered.filter(s => s.status !== 'approved' && s.status !== 'rejected').length} stories
-            </strong> as accepted. Only accepted stories can be added to sprints.
+            Marks <strong>{pendingCount} stories</strong> as accepted. Accepted stories can be added to sprints.
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={() => setConfirmAcceptAllOpen(false)} variant="outlined" sx={{ borderRadius: 2 }}>
-            Cancel
-          </Button>
-          <Button
-            onClick={async () => {
-              setConfirmAcceptAllOpen(false);
-              const ids = filtered
-                .filter(s => s.status !== 'approved' && s.status !== 'rejected')
-                .map(s => s.id);
-              await storiesApi.bulkUpdateStatus(ids, 'approved');
-              queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
-            }}
-            variant="contained"
-            startIcon={<CheckCircle />}
-            sx={{ borderRadius: 2, bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}
-          >
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setConfirmAcceptOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={async () => {
+            const ids = stories.filter((s) => s.status !== 'approved' && s.status !== 'rejected').map((s) => s.id);
+            await storiesApi.bulkUpdateStatus(ids, 'approved');
+            queryClient.invalidateQueries({ queryKey: ['stories', projectId] });
+            setConfirmAcceptOpen(false);
+          }} variant="contained" startIcon={<CheckCircle />}
+            sx={{ textTransform: 'none', bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}>
             Accept All
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Toast notifications */}
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={8000}
+      <Snackbar open={snack.open} autoHideDuration={7000}
         onClose={() => setSnack((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={snack.severity}
-          onClose={() => setSnack((s) => ({ ...s, open: false }))}
-          sx={{ borderRadius: 2 }}
-        >
-          {snack.message}
-        </Alert>
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))}
+          sx={{ borderRadius: 2, boxShadow: 4 }}>{snack.message}</Alert>
       </Snackbar>
     </Box>
   );

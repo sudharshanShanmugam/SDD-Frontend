@@ -126,7 +126,6 @@ interface CreateRequirementRequest {
   source?: string;
   rationale?: string;
   acceptanceCriteria?: string[];
-  epicId?: string;
   storyId?: string;
   assigneeId?: string;
   reviewerId?: string;
@@ -155,7 +154,7 @@ export interface GroupTopicsResult {
   groups_created: number;
   tagged: number;
   message?: string;
-  groups: Array<{ topic: string; count: number; epic_id: string }>;
+  groups: Array<{ topic: string; count: number }>;
 }
 
 interface AIGenerateRequirementsRequest {

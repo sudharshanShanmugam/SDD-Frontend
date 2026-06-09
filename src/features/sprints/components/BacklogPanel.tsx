@@ -35,9 +35,6 @@ export interface BacklogStory {
   type: 'feature' | 'bug' | 'chore' | 'spike';
   priority: 'critical' | 'high' | 'medium' | 'low';
   storyPoints: number;
-  epicId?: string;
-  epicName?: string;
-  epicColor?: string;
   labels: string[];
 }
 
@@ -98,19 +95,6 @@ const DraggableStoryCard: React.FC<DraggableStoryCardProps> = ({ story, onAddToS
                 size="small"
                 sx={{ height: 18, fontSize: '0.6rem', bgcolor: typeConf.bg, color: typeConf.text, fontWeight: 600 }}
               />
-              {story.epicName && (
-                <Chip
-                  label={story.epicName}
-                  size="small"
-                  sx={{
-                    height: 18,
-                    fontSize: '0.6rem',
-                    bgcolor: story.epicColor + '22',
-                    color: story.epicColor,
-                    fontWeight: 500,
-                  }}
-                />
-              )}
               {story.labels.slice(0, 2).map((lbl) => (
                 <Chip key={lbl} label={lbl} size="small" sx={{ height: 16, fontSize: '0.55rem' }} />
               ))}
@@ -163,7 +147,7 @@ const BacklogPanel: React.FC<BacklogPanelProps> = ({
 
   const filtered = useMemo(() => {
     return stories.filter((s) => {
-      const matchSearch = !search || s.title.toLowerCase().includes(search.toLowerCase()) || s.epicName?.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = !search || s.title.toLowerCase().includes(search.toLowerCase());
       const matchType = typeFilter === 'all' || s.type === typeFilter;
       const matchPriority = priorityFilter === 'all' || s.priority === priorityFilter;
       return matchSearch && matchType && matchPriority;

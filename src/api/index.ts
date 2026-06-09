@@ -3,7 +3,6 @@ export { projectsApi }     from './projects';
 export { requirementsApi } from './requirements';
 export { aiApi }           from './ai';
 export { documentsApi }    from './documents';
-export { epicsApi }        from './epics';
 export { storiesApi }      from './stories';
 export { sprintsApi }      from './sprints';
 export { tasksApi }        from './tasks';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Button,
@@ -136,7 +136,13 @@ function RowActions({ row, onAction }: RowActionsProps) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function OrgList() {
+interface OrgListProps {
+  search?: string;
+  planFilter?: OrgPlan | 'all';
+  statusFilter?: OrgStatus | 'all';
+}
+
+export function OrgList({ search = '', planFilter = 'all', statusFilter = 'all' }: OrgListProps) {
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
     pageSize: 10,
@@ -145,18 +151,25 @@ export function OrgList() {
   const queryClient = useQueryClient();
   const toast = useUIStore((s) => s.toast);
 
+  const planParam   = planFilter   !== 'all' ? `&plan=${planFilter}`     : '';
+  const statusParam = statusFilter !== 'all' ? `&status=${statusFilter}` : '';
+
   const { data, isLoading } = useQuery<OrgListResponse>({
-    queryKey: ['admin', 'orgs', paginationModel.page, paginationModel.pageSize],
+    queryKey: ['admin', 'orgs', paginationModel.page, paginationModel.pageSize, planFilter, statusFilter],
     queryFn: async () => {
       try {
         return await get<OrgListResponse>(
-          `/admin/organizations?page=${paginationModel.page + 1}&page_size=${paginationModel.pageSize}`
+          `/admin/organizations?page=${paginationModel.page + 1}&page_size=${paginationModel.pageSize}${planParam}${statusParam}`
         );
       } catch {
         return { data: [], total: 0 };
       }
     },
   });
+
+  const filteredRows = (data?.data ?? []).filter(r =>
+    !search || r.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   const suspendMutation = useMutation({
     mutationFn: (id: UUID) => put(`/admin/organizations/${id}/suspend`, {}),
@@ -211,7 +224,7 @@ export function OrgList() {
       headerName: 'Plan',
       width: 130,
       renderCell: (params: GridRenderCellParams<OrgRow, OrgPlan>) => (
-        <PlanChip plan={params.value} />
+        <PlanChip plan={params.value!} />
       ),
     },
     {
@@ -219,7 +232,7 @@ export function OrgList() {
       headerName: 'Status',
       width: 120,
       renderCell: (params: GridRenderCellParams<OrgRow, OrgStatus>) => (
-        <StatusChip status={params.value} />
+        <StatusChip status={params.value!} />
       ),
     },
     {
@@ -254,7 +267,7 @@ export function OrgList() {
         try {
           return (
             <Typography variant="body2" color="text.secondary">
-              {format(parseISO(params.value), 'MMM d, yyyy')}
+              {format(parseISO(params.value!), 'MMM d, yyyy')}
             </Typography>
           );
         } catch {
@@ -277,10 +290,10 @@ export function OrgList() {
   return (
     <Box>
       <DataGrid
-        rows={data?.data ?? []}
+        rows={filteredRows}
         columns={columns}
         loading={isLoading}
-        rowCount={data?.total ?? 0}
+        rowCount={filteredRows.length}
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}

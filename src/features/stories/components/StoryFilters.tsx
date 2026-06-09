@@ -7,7 +7,6 @@ export interface StoryFilterState {
   search: string;
   statuses: StoryStatus[];
   priorities: string[];
-  epicId?: string;
   sprintId?: string;
   hasPoints?: boolean;
 }
@@ -22,7 +21,7 @@ interface StoryFiltersProps {
 const ALL_STATUSES: StoryStatus[] = ['backlog', 'ready', 'in_progress', 'review', 'done'];
 const ALL_PRIORITIES = ['critical', 'high', 'medium', 'low'];
 
-const STATUS_COLORS: Record<StoryStatus, string> = { backlog: '#94a3b8', ready: '#6366f1', in_progress: '#3b82f6', review: '#f59e0b', done: '#10b981' };
+const STATUS_COLORS: Record<StoryStatus, string> = { backlog: '#94a3b8', ready: '#6366f1', in_progress: '#3b82f6', review: '#f59e0b', done: '#10b981', approved: '#10b981', rejected: '#ef4444' };
 
 const StoryFilters: React.FC<StoryFiltersProps> = ({ filters, onChange, totalCount, filteredCount }) => {
   const hasActive = filters.search || filters.statuses.length || filters.priorities.length;

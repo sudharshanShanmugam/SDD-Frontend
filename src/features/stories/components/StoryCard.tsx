@@ -1,216 +1,165 @@
 import React, { useState } from 'react';
-import {
-  Card, CardContent, Box, Typography, Chip, IconButton,
-  Tooltip, Avatar, Menu, MenuItem, Stack, Button,
-} from '@mui/material';
-import {
-  MoreVert, Edit, Delete, Visibility, AutoAwesome, Star,
-  CheckCircle, Cancel,
-} from '@mui/icons-material';
-import { motion } from 'framer-motion';
+import { Box, Typography, IconButton, Tooltip, Avatar, Menu, MenuItem, Stack } from '@mui/material';
+import { MoreVert, Edit, Delete, CheckCircle, Cancel, AutoAwesome } from '@mui/icons-material';
 
-export type StoryStatus =
-  | 'backlog' | 'ready' | 'in_progress' | 'review'
-  | 'done' | 'approved' | 'rejected';
-export type StoryType = 'feature' | 'bug' | 'tech_debt' | 'spike';
+export type StoryStatus = 'backlog' | 'ready' | 'in_progress' | 'review' | 'done' | 'approved' | 'rejected';
+export type StoryType   = 'feature' | 'bug' | 'tech_debt' | 'spike';
 
 export interface InvestScore {
   independent: number; negotiable: number; valuable: number;
   estimable: number; small: number; testable: number;
 }
-
 export interface Story {
   id: string; storyId: string; title: string; asA: string;
   iWant: string; soThat: string; type: StoryType; status: StoryStatus;
   priority: 'critical' | 'high' | 'medium' | 'low';
-  points?: number; epicId?: string; epicTitle?: string; sprintId?: string;
+  points?: number; sprintId?: string;
   assignee?: { id: string; name: string; avatar?: string };
   acceptanceCriteria?: string[]; aiConfidence?: number;
   investScore?: InvestScore; tags?: string[];
   isAiGenerated?: boolean; requirementId?: string; createdAt: string;
 }
 
-const statusConfig: Record<StoryStatus, { label: string; color: string }> = {
-  backlog:     { label: 'Backlog',     color: '#94a3b8' },
-  ready:       { label: 'Ready',       color: '#6366f1' },
-  in_progress: { label: 'In Progress', color: '#3b82f6' },
-  review:      { label: 'Review',      color: '#f59e0b' },
-  done:        { label: 'Done',        color: '#10b981' },
-  approved:    { label: 'Accepted',    color: '#10b981' },
-  rejected:    { label: 'Rejected',    color: '#ef4444' },
+export const STATUS_CONFIG: Record<StoryStatus, { label: string; color: string; bg: string }> = {
+  backlog:     { label: 'Backlog',     color: '#64748b', bg: '#f1f5f9' },
+  ready:       { label: 'Ready',       color: '#6366f1', bg: '#eef2ff' },
+  in_progress: { label: 'In Progress', color: '#3b82f6', bg: '#eff6ff' },
+  review:      { label: 'Review',      color: '#f59e0b', bg: '#fffbeb' },
+  done:        { label: 'Done',        color: '#10b981', bg: '#f0fdf4' },
+  approved:    { label: 'Accepted',    color: '#10b981', bg: '#f0fdf4' },
+  rejected:    { label: 'Rejected',    color: '#ef4444', bg: '#fef2f2' },
 };
 
-const priorityBorderColor: Record<string, string> = {
-  critical: '#ef4444', high: '#f97316', medium: '#6366f1', low: '#94a3b8',
+export const PRIORITY_CONFIG: Record<string, { color: string; label: string }> = {
+  critical: { color: '#ef4444', label: 'Critical' },
+  high:     { color: '#f97316', label: 'High' },
+  medium:   { color: '#6366f1', label: 'Medium' },
+  low:      { color: '#94a3b8', label: 'Low' },
 };
 
-const InvestIndicator: React.FC<{ score: InvestScore }> = ({ score }) => {
-  const avg = Object.values(score).reduce((a, b) => a + b, 0) / 6;
-  const pct = (avg / 5) * 100;
-  return (
-    <Tooltip
-      title={
-        <Box>
-          {Object.entries(score).map(([k, v]) => (
-            <Box key={k} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-              <Typography variant="caption" sx={{ textTransform: 'uppercase' }}>{k[0]}</Typography>
-              <Typography variant="caption" fontWeight={700}>{'★'.repeat(v)}{'☆'.repeat(5 - v)}</Typography>
-            </Box>
-          ))}
-        </Box>
-      }
-      arrow
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <Star sx={{ fontSize: 14, color: pct >= 70 ? '#f59e0b' : '#94a3b8' }} />
-        <Typography variant="caption" fontWeight={600} color={pct >= 70 ? '#f59e0b' : 'text.secondary'}>
-          INVEST
-        </Typography>
-      </Box>
-    </Tooltip>
-  );
-};
-
-interface StoryCardProps {
+interface StoryRowProps {
   story: Story;
   onEdit?: (story: Story) => void;
   onDelete?: (id: string) => void;
   onView?: (story: Story) => void;
   onStatusChange?: (id: string, status: StoryStatus) => void;
-  isDragging?: boolean;
-  compact?: boolean;
 }
 
-const CARD_HEIGHT = 200;
-
-const StoryCard: React.FC<StoryCardProps> = ({
-  story, onEdit, onDelete, onView, onStatusChange,
-  isDragging = false,
-}) => {
+const StoryRow: React.FC<StoryRowProps> = ({ story, onEdit, onDelete, onView, onStatusChange }) => {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
-  const stCfg     = statusConfig[story.status] ?? statusConfig.backlog;
-  const leftColor = priorityBorderColor[story.priority] ?? '#6366f1';
+  const [hovered, setHovered] = useState(false);
+  const stCfg   = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
+  const priColor = (PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG['medium'])!.color;
   const isSettled = story.status === 'approved' || story.status === 'rejected';
 
   return (
-    <motion.div layout animate={{ scale: isDragging ? 1.03 : 1, opacity: isDragging ? 0.85 : 1 }}>
-      <Card
-        variant="outlined"
-        sx={{
-          borderRadius: 2,
-          borderLeft: `3px solid ${leftColor}`,
-          cursor: 'pointer',
-          height: CARD_HEIGHT,
-          display: 'flex',
-          flexDirection: 'column',
-          '&:hover': { boxShadow: 3 },
-          transition: 'box-shadow 0.15s',
-          ...(story.status === 'approved' && { bgcolor: '#f0fdf4' }),
-          ...(story.status === 'rejected' && { bgcolor: '#fef2f2' }),
-        }}
-        elevation={isDragging ? 8 : 0}
-        onClick={() => onView?.(story)}
-      >
-        <CardContent sx={{ p: 2, pb: '12px !important', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <Box
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => onView?.(story)}
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: '4px 80px 1fr 100px 52px 32px 80px 32px',
+        alignItems: 'center', gap: 2,
+        px: 2, py: 1.25,
+        borderBottom: '1px solid', borderColor: 'divider',
+        cursor: 'pointer',
+        '&:hover': { bgcolor: 'action.hover' },
+        '&:last-child': { borderBottom: 'none' },
+      }}
+    >
+      {/* Priority bar */}
+      <Box sx={{ height: 28, borderRadius: 1, bgcolor: priColor, opacity: hovered ? 0.9 : 0.5, transition: 'opacity 0.15s' }} />
 
-          {/* ── Header row ── */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75, flexShrink: 0 }}>
-            <Box sx={{ display: 'flex', gap: 0.5, overflow: 'hidden' }}>
-              <Chip label={story.storyId} size="small"
-                sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, fontFamily: 'monospace', flexShrink: 0 }} />
-              {story.points !== undefined && (
-                <Chip label={`${story.points} pts`} size="small" variant="outlined"
-                  sx={{ height: 18, fontSize: '0.62rem', flexShrink: 0 }} />
-              )}
-            </Box>
-            <IconButton size="small" sx={{ flexShrink: 0, ml: 0.5 }}
-              onClick={(e) => { e.stopPropagation(); setMenuAnchor(e.currentTarget); }}>
-              <MoreVert sx={{ fontSize: 15 }} />
-            </IconButton>
-          </Box>
+      {/* ID */}
+      <Typography variant="caption" fontFamily="monospace" fontWeight={700}
+        sx={{ color: 'text.disabled', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {story.storyId}
+      </Typography>
 
-          {/* ── Title — 2 lines max ── */}
-          <Typography variant="body2" fontWeight={600}
-            sx={{ mb: 0.5, flexShrink: 0, overflow: 'hidden', display: '-webkit-box',
-                  WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-            {story.title}
-          </Typography>
+      {/* Title + sub */}
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="body2" fontWeight={600} noWrap>{story.title}</Typography>
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', lineHeight: 1.3 }}>
+          As a <strong>{story.asA}</strong> · {story.iWant}
+        </Typography>
+      </Box>
 
-          {/* ── "As a … I want…" — 2 lines max ── */}
-          <Typography variant="caption" color="text.secondary"
-            sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden', mb: 'auto', lineHeight: 1.4 }}>
-            As a <strong>{story.asA}</strong>, I want <em>{story.iWant}</em>
-          </Typography>
+      {/* Status */}
+      <Box sx={{ px: 1, py: 0.3, borderRadius: 10, bgcolor: stCfg.bg, textAlign: 'center' }}>
+        <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: stCfg.color, lineHeight: 1.4 }}>{stCfg.label}</Typography>
+      </Box>
 
-          {/* ── Status + assignee row ── */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, flexShrink: 0 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, overflow: 'hidden' }}>
-              <Chip label={stCfg.label} size="small"
-                sx={{ height: 18, fontSize: '0.62rem', bgcolor: stCfg.color + '1a',
-                      color: stCfg.color, borderRadius: 1, flexShrink: 0 }} />
-              {story.investScore && <InvestIndicator score={story.investScore} />}
-              {story.aiConfidence !== undefined && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, flexShrink: 0 }}>
-                  <AutoAwesome sx={{ fontSize: 11, color: 'secondary.main' }} />
-                  <Typography variant="caption" color="secondary.main">{story.aiConfidence}%</Typography>
-                </Box>
-              )}
-            </Box>
-            {story.assignee && (
-              <Tooltip title={story.assignee.name}>
-                <Avatar {...(story.assignee.avatar ? { src: story.assignee.avatar } : {})}
-                  sx={{ width: 20, height: 20, fontSize: '0.6rem', flexShrink: 0 }}>
-                  {story.assignee.name[0]}
-                </Avatar>
-              </Tooltip>
-            )}
-          </Box>
+      {/* Points */}
+      <Typography variant="caption" fontWeight={700} textAlign="center"
+        sx={{ color: story.points !== undefined ? 'text.primary' : 'text.disabled' }}>
+        {story.points !== undefined ? `${story.points}p` : '—'}
+      </Typography>
 
-          {/* ── Accept / Decline ── */}
-          {onStatusChange && !isSettled && (
-            <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexShrink: 0 }}
-              onClick={(e) => e.stopPropagation()}>
-              <Button size="small" variant="outlined" startIcon={<CheckCircle sx={{ fontSize: 12 }} />}
-                sx={{ fontSize: '0.65rem', py: 0.2, flex: 1, color: '#10b981', borderColor: '#10b981',
-                      '&:hover': { bgcolor: '#f0fdf4' }, minWidth: 0 }}
-                onClick={() => onStatusChange(story.id, 'approved')}>
-                Accept
-              </Button>
-              <Button size="small" variant="outlined" startIcon={<Cancel sx={{ fontSize: 12 }} />}
-                sx={{ fontSize: '0.65rem', py: 0.2, flex: 1, color: '#ef4444', borderColor: '#ef4444',
-                      '&:hover': { bgcolor: '#fef2f2' }, minWidth: 0 }}
-                onClick={() => onStatusChange(story.id, 'rejected')}>
-                Decline
-              </Button>
-            </Stack>
-          )}
+      {/* AI */}
+      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+        {story.isAiGenerated && (
+          <Tooltip title="AI generated">
+            <AutoAwesome sx={{ fontSize: 13, color: 'secondary.main', opacity: 0.7 }} />
+          </Tooltip>
+        )}
+      </Box>
 
-        </CardContent>
-      </Card>
+      {/* Assignee + hover actions */}
+      <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.25}
+        onClick={(e) => e.stopPropagation()}>
+        {hovered && onStatusChange && !isSettled ? (
+          <>
+            <Tooltip title="Accept">
+              <IconButton size="small" onClick={() => onStatusChange(story.id, 'approved')}
+                sx={{ color: '#10b981', p: 0.4 }}>
+                <CheckCircle sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Decline">
+              <IconButton size="small" onClick={() => onStatusChange(story.id, 'rejected')}
+                sx={{ color: '#ef4444', p: 0.4 }}>
+                <Cancel sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+          </>
+        ) : story.assignee ? (
+          <Tooltip title={story.assignee.name}>
+            <Avatar {...(story.assignee.avatar ? { src: story.assignee.avatar } : {})}
+              sx={{ width: 24, height: 24, fontSize: '0.6rem' }}>
+              {story.assignee.name[0]}
+            </Avatar>
+          </Tooltip>
+        ) : null}
+      </Stack>
+
+      {/* Menu */}
+      <Box onClick={(e) => e.stopPropagation()}>
+        <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}
+          sx={{ opacity: hovered ? 1 : 0, transition: 'opacity 0.15s', color: 'text.secondary', p: 0.4 }}>
+          <MoreVert sx={{ fontSize: 15 }} />
+        </IconButton>
+      </Box>
 
       <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}
         onClick={(e) => e.stopPropagation()}>
-        <MenuItem onClick={() => { onView?.(story); setMenuAnchor(null); }}>
-          <Visibility fontSize="small" sx={{ mr: 1 }} /> View
-        </MenuItem>
-        <MenuItem onClick={() => { onEdit?.(story); setMenuAnchor(null); }}>
-          <Edit fontSize="small" sx={{ mr: 1 }} /> Edit
+        <MenuItem dense onClick={() => { onEdit?.(story); setMenuAnchor(null); }}>
+          <Edit fontSize="small" sx={{ mr: 1.5, fontSize: 16 }} /> Edit
         </MenuItem>
         {onStatusChange && !isSettled && [
-          <MenuItem key="acc" onClick={() => { onStatusChange(story.id, 'approved'); setMenuAnchor(null); }}>
-            <CheckCircle fontSize="small" sx={{ mr: 1, color: '#10b981' }} /> Accept
+          <MenuItem dense key="acc" onClick={() => { onStatusChange(story.id, 'approved'); setMenuAnchor(null); }}>
+            <CheckCircle sx={{ mr: 1.5, fontSize: 16, color: '#10b981' }} /> Accept
           </MenuItem>,
-          <MenuItem key="dec" onClick={() => { onStatusChange(story.id, 'rejected'); setMenuAnchor(null); }}>
-            <Cancel fontSize="small" sx={{ mr: 1, color: '#ef4444' }} /> Decline
+          <MenuItem dense key="dec" onClick={() => { onStatusChange(story.id, 'rejected'); setMenuAnchor(null); }}>
+            <Cancel sx={{ mr: 1.5, fontSize: 16, color: '#ef4444' }} /> Decline
           </MenuItem>,
         ]}
-        <MenuItem sx={{ color: 'error.main' }} onClick={() => { onDelete?.(story.id); setMenuAnchor(null); }}>
-          <Delete fontSize="small" sx={{ mr: 1 }} /> Delete
+        <MenuItem dense sx={{ color: 'error.main' }} onClick={() => { onDelete?.(story.id); setMenuAnchor(null); }}>
+          <Delete sx={{ mr: 1.5, fontSize: 16 }} /> Delete
         </MenuItem>
       </Menu>
-    </motion.div>
+    </Box>
   );
 };
 
-export default StoryCard;
+export default StoryRow;

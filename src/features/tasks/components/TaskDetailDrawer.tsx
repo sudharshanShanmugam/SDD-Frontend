@@ -11,6 +11,10 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Drawer,
   FormControl,
@@ -343,8 +347,9 @@ function CommentsSection({ taskId: _taskId }: { taskId: string }) {
 function WorkLogSection({ taskId }: { taskId: string }) {
   const { toast } = useUIStore()
   const queryClient = useQueryClient()
-  const [showForm, setShowForm] = useState(false)
-  const [hours, setHours] = useState('')
+  const [open, setOpen] = useState(false)
+  const [logH, setLogH] = useState('')
+  const [logM, setLogM] = useState('')
   const [note, setNote] = useState('')
   const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10))
 
@@ -354,15 +359,20 @@ function WorkLogSection({ taskId }: { taskId: string }) {
     staleTime: 30_000,
   })
 
+  const totalHours = (parseInt(logH || '0', 10)) + (parseInt(logM || '0', 10)) / 60
+
   const logMutation = useMutation({
-    mutationFn: () => tasksApi.logTime(taskId, { hours: parseFloat(hours), ...(note ? { description: note } : {}), loggedDate: logDate }),
+    mutationFn: () => tasksApi.logTime(taskId, {
+      hours: totalHours,
+      ...(note ? { description: note } : {}),
+      loggedDate: logDate,
+    }),
     onSuccess: () => {
       toast.success('Time logged')
       queryClient.invalidateQueries({ queryKey: ['task-timelogs', taskId] })
       queryClient.invalidateQueries({ queryKey: ['task-detail', taskId] })
-      setHours('')
-      setNote('')
-      setShowForm(false)
+      setLogH(''); setLogM(''); setNote('')
+      setOpen(false)
     },
     onError: () => toast.error('Failed to log time'),
   })
@@ -377,11 +387,17 @@ function WorkLogSection({ taskId }: { taskId: string }) {
     onError: () => toast.error('Failed to delete log'),
   })
 
+  const handleClose = () => {
+    setOpen(false)
+    setLogH(''); setLogM(''); setNote('')
+    setLogDate(new Date().toISOString().slice(0, 10))
+  }
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       {isLoading ? (
         <Box sx={{ textAlign: 'center', py: 2 }}><CircularProgress size={24} /></Box>
-      ) : timeLogs.length === 0 && !showForm ? (
+      ) : timeLogs.length === 0 ? (
         <Typography variant="body2" color="text.disabled" sx={{ textAlign: 'center', py: 2 }}>
           No time logged yet.
         </Typography>
@@ -407,12 +423,8 @@ function WorkLogSection({ taskId }: { taskId: string }) {
               )}
             </Box>
             <Tooltip title="Delete log">
-              <IconButton
-                size="small"
-                color="error"
-                sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}
-                onClick={() => deleteMutation.mutate(log.id)}
-              >
+              <IconButton size="small" color="error" sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}
+                onClick={() => deleteMutation.mutate(log.id)}>
                 <Delete sx={{ fontSize: 14 }} />
               </IconButton>
             </Tooltip>
@@ -420,61 +432,72 @@ function WorkLogSection({ taskId }: { taskId: string }) {
         ))
       )}
 
-      {showForm ? (
-        <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Typography variant="caption" fontWeight={700} color="text.secondary">LOG TIME</Typography>
-          <Stack direction="row" spacing={1.5}>
-            <TextField
-              label="Hours"
-              type="number"
-              size="small"
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              slotProps={{ htmlInput: { min: 0.25, max: 24, step: 0.25 } }}
-              placeholder="1.5"
-              sx={{ width: 110 }}
-            />
-            <TextField
-              label="Date"
-              type="date"
-              size="small"
-              value={logDate}
-              onChange={(e) => setLogDate(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-          </Stack>
+      <Button size="small" variant="outlined" startIcon={<Add />} onClick={() => setOpen(true)} sx={{ alignSelf: 'flex-start' }}>
+        Log Time
+      </Button>
+
+      {/* ── Log Time dialog ── */}
+      <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ pb: 1, fontSize: '1rem', fontWeight: 700 }}>Log Time</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important' }}>
+          {/* h : m inputs */}
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.75, display: 'block' }}>Time Spent</Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TextField
+                autoFocus
+                size="small"
+                type="number"
+                label="Hours"
+                value={logH}
+                onChange={(e) => setLogH(e.target.value)}
+                slotProps={{ htmlInput: { min: 0, step: 1, style: { textAlign: 'center' } } }}
+                placeholder="0"
+                sx={{ width: 90 }}
+              />
+              <Typography variant="h6" color="text.secondary" sx={{ pb: 0.25 }}>:</Typography>
+              <TextField
+                size="small"
+                type="number"
+                label="Minutes"
+                value={logM}
+                onChange={(e) => setLogM(e.target.value)}
+                slotProps={{ htmlInput: { min: 0, max: 59, step: 1, style: { textAlign: 'center' } } }}
+                placeholder="0"
+                sx={{ width: 90 }}
+              />
+            </Stack>
+          </Box>
           <TextField
-            label="Note (optional)"
             size="small"
+            type="date"
+            label="Date"
+            value={logDate}
+            onChange={(e) => setLogDate(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
             fullWidth
+          />
+          <TextField
+            size="small"
+            label="Note (optional)"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="What did you work on?"
+            fullWidth
           />
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Button size="small" onClick={() => { setShowForm(false); setHours(''); setNote('') }}>Cancel</Button>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={!hours || logMutation.isPending}
-              onClick={() => logMutation.mutate()}
-            >
-              {logMutation.isPending ? <CircularProgress size={14} color="inherit" /> : 'Log Time'}
-            </Button>
-          </Stack>
-        </Box>
-      ) : (
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<Add />}
-          onClick={() => setShowForm(true)}
-          sx={{ alignSelf: 'flex-start' }}
-        >
-          Log Time
-        </Button>
-      )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button size="small" onClick={handleClose}>Cancel</Button>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={totalHours <= 0 || logMutation.isPending}
+            onClick={() => logMutation.mutate()}
+          >
+            {logMutation.isPending ? <CircularProgress size={14} color="inherit" /> : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
@@ -495,6 +518,9 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
   const [editTitle, setEditTitle] = useState<string | null>(null)
   const [descHtml, setDescHtml] = useState<string>('')
   const [descDirty, setDescDirty] = useState(false)
+  const [editLoggedHours, setEditLoggedHours] = useState(false)
+  const [logHoursInput, setLogHoursInput] = useState('')
+  const [logMinsInput, setLogMinsInput] = useState('')
 
   const { data: task, isLoading } = useQuery<Task>({
     queryKey: ['task-detail', taskId],
@@ -704,7 +730,7 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                 size="small"
                 fullWidth
                 value={task.dueDate ? task.dueDate.slice(0, 10) : ''}
-                onChange={(e) => patch({ dueDate: e.target.value || null } as any)}
+                onChange={(e) => patch({ due_date: e.target.value || null } as any)}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
             </Box>
@@ -818,23 +844,69 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
             {/* Logged Hours */}
             <Box>
               <FieldLabel>Logged Hours</FieldLabel>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 0.75, border: '1px solid', borderColor: 'divider', borderRadius: 1, minHeight: 40, bgcolor: 'action.hover' }}>
+              <Stack
+                direction="row" spacing={1} alignItems="center"
+                onClick={() => {
+                  const total = task.loggedHours ?? 0
+                  setLogHoursInput(String(Math.floor(total)))
+                  setLogMinsInput(String(Math.round((total % 1) * 60)))
+                  setEditLoggedHours(true)
+                }}
+                sx={{ p: 0.75, border: '1px solid', borderColor: 'divider', borderRadius: 1, minHeight: 40, cursor: 'pointer', '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' } }}
+              >
                 <AccessTime sx={{ fontSize: 16, color: 'text.secondary' }} />
                 <Typography variant="body2" fontWeight={500}>{toHhMm(task.loggedHours)}</Typography>
               </Stack>
+
+              <Dialog open={editLoggedHours} onClose={() => setEditLoggedHours(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ pb: 1, fontSize: '1rem', fontWeight: 700 }}>Edit Logged Hours</DialogTitle>
+                <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important' }}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 0.75, display: 'block' }}>Time Spent</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <TextField
+                        autoFocus
+                        size="small"
+                        type="number"
+                        label="Hours"
+                        value={logHoursInput}
+                        onChange={(e) => setLogHoursInput(e.target.value)}
+                        slotProps={{ htmlInput: { min: 0, step: 1, style: { textAlign: 'center' } } }}
+                        placeholder="0"
+                        sx={{ width: 90 }}
+                      />
+                      <Typography variant="h6" color="text.secondary" sx={{ pb: 0.25 }}>:</Typography>
+                      <TextField
+                        size="small"
+                        type="number"
+                        label="Minutes"
+                        value={logMinsInput}
+                        onChange={(e) => setLogMinsInput(e.target.value)}
+                        slotProps={{ htmlInput: { min: 0, max: 59, step: 1, style: { textAlign: 'center' } } }}
+                        placeholder="0"
+                        sx={{ width: 90 }}
+                      />
+                    </Stack>
+                  </Box>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                  <Button size="small" onClick={() => setEditLoggedHours(false)}>Cancel</Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => {
+                      const h = parseInt(logHoursInput || '0', 10)
+                      const m = parseInt(logMinsInput || '0', 10)
+                      patch({ actual_hours: h + m / 60 } as any)
+                      setEditLoggedHours(false)
+                    }}
+                  >
+                    Save
+                  </Button>
+                </DialogActions>
+              </Dialog>
             </Box>
 
-            {/* Tags */}
-            <Box>
-              <FieldLabel>Tags</FieldLabel>
-              <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ p: 0.75, border: '1px solid', borderColor: 'divider', borderRadius: 1, minHeight: 40 }}>
-                {task.tags?.length ? task.tags.map((tag) => (
-                  <Chip key={tag} label={tag} size="small" variant="outlined" sx={{ height: 22, fontSize: '0.7rem' }} />
-                )) : (
-                  <Typography variant="body2" color="text.disabled">No tags</Typography>
-                )}
-              </Stack>
-            </Box>
           </Box>
 
           <Divider />

@@ -33,23 +33,10 @@ const STORY_TYPE_ICON: Record<string, React.ReactNode> = {
   feature:    <Assignment sx={{ fontSize: 14 }} />,
 };
 
-function epicColour(epicId: string): string {
-  const palette = [
-    '#6366f1', '#0ea5e9', '#10b981', '#f59e0b',
-    '#ec4899', '#8b5cf6', '#14b8a6', '#f97316',
-  ];
-  let hash = 0;
-  for (let i = 0; i < epicId.length; i++) {
-    hash = epicId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return palette[Math.abs(hash) % palette.length] as string;
-}
-
 // ─── Props ────────────────────────────────────────────────────────────────
 
 export interface BacklogItemProps {
   story: StorySummary;
-  epicName?: string;
   onClick?: (story: StorySummary) => void;
   /** Rendered inside DragOverlay – no drag hooks, just visual */
   isOverlay?: boolean;
@@ -59,7 +46,6 @@ export interface BacklogItemProps {
 
 const BacklogItem: React.FC<BacklogItemProps> = ({
   story,
-  epicName,
   onClick,
   isOverlay = false,
 }) => {
@@ -169,7 +155,7 @@ const BacklogItem: React.FC<BacklogItemProps> = ({
           {story.title}
         </Typography>
 
-        {/* Priority · epic · points */}
+        {/* Priority · points */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
           <Chip
             label={priorityCfg.label}
@@ -178,21 +164,6 @@ const BacklogItem: React.FC<BacklogItemProps> = ({
             variant="outlined"
             sx={{ height: 20, fontSize: '0.68rem', fontWeight: 600, pointerEvents: 'none' }}
           />
-
-          {epicName && story.epicId && (
-            <Chip
-              label={epicName}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: '0.68rem',
-                bgcolor: epicColour(story.epicId) + '22',
-                color: epicColour(story.epicId),
-                border: `1px solid ${epicColour(story.epicId)}44`,
-                pointerEvents: 'none',
-              }}
-            />
-          )}
 
           <Box sx={{ ml: 'auto' }}>
             {story.storyPoints != null ? (
