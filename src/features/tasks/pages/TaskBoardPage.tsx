@@ -504,7 +504,7 @@ export function TaskBoardPage(): React.JSX.Element {
   const [testLoading]       = useState(false)
   const [testError]           = useState<string | null>(null)
 
-  // Fetch sprints to find the active one
+  // Fetch sprints — find active or planning sprint
   const { data: sprintsData } = useQuery({
     queryKey: ['sprints', projectId],
     queryFn: () => sprintsApi.list(projectId!),
@@ -512,13 +512,17 @@ export function TaskBoardPage(): React.JSX.Element {
     staleTime: 60_000,
   })
   const sprints: any[] = (sprintsData as any)?.data ?? []
-  const activeSprint = sprints.find((s: any) => s.status === 'active') ?? null
+  const activeSprint  = sprints.find((s: any) => s.status === 'active')  ?? null
+  const planningSprint = sprints.find((s: any) => s.status === 'planning') ?? null
+  // currentSprint drives which stories/tasks we fetch
+  const currentSprint = activeSprint ?? planningSprint ?? null
+  const isPlanning = !activeSprint && !!planningSprint
 
-  // Fetch stories in the active sprint so we can filter tasks client-side
+  // Fetch stories in the current sprint so we can filter tasks client-side
   const { data: sprintStoriesData } = useQuery({
-    queryKey: ['sprint-stories', activeSprint?.id],
-    queryFn: () => storiesApi.list(projectId!, { sprint_id: activeSprint!.id }),
-    enabled: !!activeSprint && !!projectId,
+    queryKey: ['sprint-stories', currentSprint?.id],
+    queryFn: () => storiesApi.list(projectId!, { sprint_id: currentSprint!.id }),
+    enabled: !!currentSprint && !!projectId,
     staleTime: 30_000,
   })
   const sprintStoryIds = useMemo(() => {
@@ -526,7 +530,7 @@ export function TaskBoardPage(): React.JSX.Element {
     return new Set<string>(ids)
   }, [sprintStoriesData])
 
-  // Always fetch ALL project tasks — filter client-side to active sprint stories
+  // Always fetch ALL project tasks — filter client-side to current sprint stories
   const { data, isLoading } = useQuery({
     queryKey: ['tasks', 'board', projectId],
     queryFn: () => tasksApi.listByProject(projectId!),
@@ -546,12 +550,12 @@ export function TaskBoardPage(): React.JSX.Element {
 
   const allTasks: Task[] = (data as any)?.data ?? []
 
-  // Show only tasks for stories in the active sprint; nothing if no sprint is active
+  // Show tasks for stories in the current sprint (planning or active)
   const tasks: Task[] = useMemo(() => {
-    if (!activeSprint) return []
+    if (!currentSprint) return []
     if (sprintStoryIds.size === 0) return []
     return allTasks.filter((t) => sprintStoryIds.has(t.storyId as string))
-  }, [allTasks, activeSprint, sprintStoryIds])
+  }, [allTasks, currentSprint, sprintStoryIds])
 
   const tasksByColumn = useMemo(() => {
     const map: Record<TaskStatus, Task[]> = {
@@ -696,7 +700,9 @@ export function TaskBoardPage(): React.JSX.Element {
       <PageHeader
         title="Task Board"
         subtitle={activeSprint
-          ? `${activeSprint.name} — showing tasks for active sprint`
+          ? `${activeSprint.name} — active sprint`
+          : isPlanning
+          ? `${planningSprint!.name} — sprint backlog (start sprint to begin work)`
           : 'Drag tasks between columns to update status — click a card to view details'
         }
         breadcrumbs={[
@@ -707,6 +713,9 @@ export function TaskBoardPage(): React.JSX.Element {
           <Stack direction="row" spacing={1} alignItems="center">
             {activeSprint && (
               <Chip label={`${activeSprint.name} (Active)`} size="small" color="primary" sx={{ height: 24, fontSize: '0.72rem' }} />
+            )}
+            {isPlanning && (
+              <Chip label={`${planningSprint!.name} (Planning)`} size="small" color="warning" sx={{ height: 24, fontSize: '0.72rem' }} />
             )}
             <Button
               variant="outlined"
@@ -732,63 +741,135 @@ export function TaskBoardPage(): React.JSX.Element {
 
       {isLoading && <LinearProgress />}
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            gap: 2,
-            overflowX: 'auto',
-            pb: 3,
-            pt: 1,
-            '&::-webkit-scrollbar': { height: 6 },
-            '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-            '&::-webkit-scrollbar-thumb': {
-              bgcolor: 'divider',
-              borderRadius: 3,
-              '&:hover': { bgcolor: 'action.selected' },
-            },
-          }}
-        >
-          {COLUMNS.map((column) => (
-            <KanbanColumn
-              key={column.id}
-              column={column}
-              tasks={tasksByColumn[column.id]}
-              stories={[]}
-              sprintMode={false}
-              onTaskClick={handleDetailClick}
-              onStoryClick={handleStoryClick}
-              isUpdating={updatingId !== null && tasksByColumn[column.id].some((t) => t.id === updatingId)}
+      {/* ── Planning sprint: flat backlog list ── */}
+      {!isLoading && isPlanning && (
+        <>
+          {tasks.length > 0 ? (
+            <Box sx={{ px: 0, pt: 1, pb: 3 }}>
+              <Box sx={{
+                border: '1px solid', borderColor: 'divider', borderRadius: 2,
+                overflow: 'hidden', bgcolor: 'background.paper',
+              }}>
+                {/* Header */}
+                <Box sx={{
+                  px: 2, py: 1.25, bgcolor: 'action.hover',
+                  borderBottom: '1px solid', borderColor: 'divider',
+                  display: 'flex', alignItems: 'center', gap: 1,
+                }}>
+                  <Typography variant="subtitle2" fontWeight={700}>Sprint Backlog</Typography>
+                  <Chip label={tasks.length} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                    Start the sprint to move tasks to the board
+                  </Typography>
+                </Box>
+                {/* Task rows */}
+                {tasks.map((task, idx) => (
+                  <Box
+                    key={task.id}
+                    onClick={() => handleDetailClick(task.id)}
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: '60px 1fr 80px 64px',
+                      gap: 2, px: 2, py: 1,
+                      borderBottom: idx < tasks.length - 1 ? '1px solid' : 'none',
+                      borderColor: 'divider',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: 'action.hover' },
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'primary.main', fontWeight: 600 }}>
+                      {task.identifier || '—'}
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {task.title}
+                    </Typography>
+                    <Chip
+                      label="Backlog"
+                      size="small"
+                      sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'action.selected' }}
+                    />
+                    {task.estimatedHours != null && (
+                      <Typography variant="caption" color="text.secondary" textAlign="right">
+                        {task.estimatedHours}h
+                      </Typography>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          ) : (
+            <EmptyState
+              variant="no-data"
+              title={`${planningSprint!.name} — no tasks yet`}
+              description="Generate tasks from the Sprint Planning tab, then start the sprint to begin working."
             />
-          ))}
-        </Box>
+          )}
+        </>
+      )}
 
-        <DragOverlay dropAnimation={null}>
-          {activeTask ? <TaskCardView task={activeTask} dragging /> : null}
-        </DragOverlay>
-      </DndContext>
+      {/* ── Active sprint: full kanban ── */}
+      {!isPlanning && (
+        <>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 2,
+                overflowX: 'auto',
+                pb: 3,
+                pt: 1,
+                '&::-webkit-scrollbar': { height: 6 },
+                '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+                '&::-webkit-scrollbar-thumb': {
+                  bgcolor: 'divider',
+                  borderRadius: 3,
+                  '&:hover': { bgcolor: 'action.selected' },
+                },
+              }}
+            >
+              {COLUMNS.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  tasks={tasksByColumn[column.id]}
+                  stories={[]}
+                  sprintMode={false}
+                  onTaskClick={handleDetailClick}
+                  onStoryClick={handleStoryClick}
+                  isUpdating={updatingId !== null && tasksByColumn[column.id].some((t) => t.id === updatingId)}
+                />
+              ))}
+            </Box>
 
-      {!isLoading && tasks.length === 0 && (
-        <EmptyState
-          variant="no-data"
-          title={activeSprint ? `No tasks in ${activeSprint.name} yet` : 'No active sprint'}
-          description={
-            !activeSprint
-              ? 'Start a sprint from Sprint Planning to see tasks here.'
-              : activeSprint && sprintStoryIds.size > 0
-              ? `${activeSprint.name} has ${sprintStoryIds.size} stories but no tasks. Create default tasks (Implementation, Tests, Review) for each story instantly.`
-              : 'Tasks track the work inside a user story. Create one with Add Task, or generate them from Sprint Planning.'
-          }
-          action={activeSprint ? {
-            label: settingUp ? (setupProgress || 'Creating tasks…') : 'Setup All Sprint Tasks',
-            onClick: handleSetupSprintTasks,
-          } : undefined}
-        />
+            <DragOverlay dropAnimation={null}>
+              {activeTask ? <TaskCardView task={activeTask} dragging /> : null}
+            </DragOverlay>
+          </DndContext>
+
+          {!isLoading && tasks.length === 0 && (
+            <EmptyState
+              variant="no-data"
+              title={activeSprint ? `No tasks in ${activeSprint.name} yet` : 'No active sprint'}
+              description={
+                !currentSprint
+                  ? 'Generate tasks from Sprint Planning, then start the sprint to see them here.'
+                  : activeSprint && sprintStoryIds.size > 0
+                  ? `${activeSprint.name} has ${sprintStoryIds.size} stories but no tasks. Create default tasks instantly.`
+                  : 'Tasks track the work inside a user story. Create one with Add Task or generate from Sprint Planning.'
+              }
+              action={activeSprint ? {
+                label: settingUp ? (setupProgress || 'Creating tasks…') : 'Setup All Sprint Tasks',
+                onClick: handleSetupSprintTasks,
+              } : undefined}
+            />
+          )}
+        </>
       )}
 
       {/* ── Create Task dialog ── */}
