@@ -103,11 +103,15 @@ apiClient.interceptors.response.use(
   (error: unknown) => {
     if (!isAxiosError(error)) return Promise.reject(error);
 
-    // ── 401 — Unauthorized → auto logout ──────────────────
-    // Skip auth endpoints (login, refresh) — let them surface the error normally
-    const url = error.config?.url ?? '';
-    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/token');
-    if (error.response?.status === 401 && !isAuthEndpoint) {
+    // ── 401 — Session expired/revoked → auto logout ───────
+    // Only trigger on token-specific error codes from the backend.
+    // Plain 401s (wrong password, permission issues) are left for the caller.
+    const SESSION_EXPIRED_CODES = new Set([
+      'TOKEN_EXPIRED', 'TOKEN_REVOKED', 'INVALID_TOKEN',
+      'AUTHENTICATION_FAILED', 'AUTHENTICATION_ERROR',
+    ]);
+    const errorCode = (error.response?.data as any)?.error_code as string | undefined;
+    if (error.response?.status === 401 && errorCode && SESSION_EXPIRED_CODES.has(errorCode)) {
       import('@store/authStore').then(({ useAuthStore }) => {
         useAuthStore.getState().logout();
       });
