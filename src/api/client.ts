@@ -37,6 +37,7 @@ export const apiClient: AxiosInstance = axios.create({
 
 // Guard against multiple concurrent logout redirects
 let _loggingOut = false;
+export function resetLogoutGuard() { _loggingOut = false; }
 
 // ============================================================
 // Request Interceptor — Request ID + Logging
@@ -103,18 +104,15 @@ apiClient.interceptors.response.use(
     if (!isAxiosError(error)) return Promise.reject(error);
 
     // ── 401 — Session expired/revoked → auto logout ───────
-    // Only trigger on token-specific error codes from the backend.
-    // Plain 401s (wrong password, permission issues) are left for the caller.
-    const SESSION_EXPIRED_CODES = new Set([
-      'TOKEN_EXPIRED', 'TOKEN_REVOKED', 'INVALID_TOKEN',
-      'AUTHENTICATION_FAILED', 'AUTHENTICATION_ERROR',
-    ]);
+    // Auto-logout only on clear token-expiry/revocation signals.
+    // AUTHENTICATION_FAILED means "no token sent" — could be a race on first load,
+    // so we do NOT include it here; only true session-expiry codes trigger logout.
     const errorCode = (error.response?.data as any)?.error_code as string | undefined;
-    if (error.response?.status === 401 && errorCode && SESSION_EXPIRED_CODES.has(errorCode)) {
+    const isSessionExpired = error.response?.status === 401 &&
+      (errorCode === 'TOKEN_EXPIRED' || errorCode === 'TOKEN_REVOKED');
+    if (isSessionExpired) {
       if (!_loggingOut) {
         _loggingOut = true;
-        // Clear auth state synchronously before redirecting so the page
-        // reload doesn't re-hydrate stale tokens from localStorage.
         localStorage.removeItem('sdd_auth_v2');
         window.location.replace('/login');
       }

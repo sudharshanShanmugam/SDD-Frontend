@@ -6,7 +6,7 @@ import {
 } from '@mui/material'
 import { LockOutlined } from '@mui/icons-material'
 import { useAuthStore } from '@store/authStore'
-import { apiClient } from '@/api/client'
+import { apiClient, resetLogoutGuard } from '@/api/client'
 
 export default function LoginPage() {
   const navigate         = useNavigate()
@@ -28,6 +28,7 @@ export default function LoginPage() {
       const res = await apiClient.post('/auth/login', { email, password })
       const data = res.data as any
       if (!data.access_token) throw new Error('Invalid response from server')
+      resetLogoutGuard()
       setAuthFromLogin(data)
       navigate(from, { replace: true })
     } catch (err: any) {
