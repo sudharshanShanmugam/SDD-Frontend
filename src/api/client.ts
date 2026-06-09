@@ -6,6 +6,8 @@ import axios, {
   isAxiosError,
 } from 'axios';
 import { nanoid } from 'nanoid';
+// Inline import to avoid circular deps — authStore does NOT import client.ts
+import { useAuthStore } from '@store/authStore';
 
 // ============================================================
 // Config
@@ -42,15 +44,9 @@ let _loggingOut = false;
 
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Inject auth token from Zustand store
-    try {
-      const raw = localStorage.getItem('sdd_auth_v2');
-      if (raw) {
-        const stored = JSON.parse(raw) as { state?: { tokens?: { accessToken?: string } } };
-        const token = stored?.state?.tokens?.accessToken;
-        if (token) config.headers.set('Authorization', `Bearer ${token}`);
-      }
-    } catch { /* ignore */ }
+    // Inject auth token — read from in-memory store (always current, no localStorage race)
+    const token = useAuthStore.getState().tokens?.accessToken;
+    if (token) config.headers.set('Authorization', `Bearer ${token}`);
 
     // Inject request ID for distributed tracing
     const requestId = nanoid();
