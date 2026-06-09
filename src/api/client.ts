@@ -48,8 +48,9 @@ async function refreshAccessToken(): Promise<string> {
     const { tokens, setAuthFromLogin } = useAuthStore.getState();
     const refreshToken = tokens?.refreshToken;
     if (!refreshToken) throw new Error('No refresh token');
+    const base = apiClient.defaults.baseURL ?? '/api/v1';
     const resp = await axios.post(
-      apiClient.defaults.baseURL + '/auth/refresh',
+      `${base}/auth/refresh`,
       { refresh_token: refreshToken },
     );
     const data = resp.data as { access_token: string; refresh_token: string; expires_in: number; user?: any };
@@ -120,7 +121,7 @@ apiClient.interceptors.response.use(
     return response;
   },
 
-  (error: unknown) => {
+  async (error: unknown) => {
     if (!isAxiosError(error)) return Promise.reject(error);
 
     // ── 401 — Try silent token refresh, log out only if refresh fails ─
@@ -132,8 +133,7 @@ apiClient.interceptors.response.use(
       (error.config as any)._retry = true;
       try {
         const newToken = await refreshAccessToken();
-        error.config.headers = error.config.headers ?? {};
-        error.config.headers['Authorization'] = `Bearer ${newToken}`;
+        error.config.headers.set('Authorization', `Bearer ${newToken}`);
         return apiClient.request(error.config);
       } catch {
         // Refresh failed — fall through to logout
