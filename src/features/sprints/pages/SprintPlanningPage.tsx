@@ -33,10 +33,9 @@ import {
   DeleteOutline,
   Search,
   ExpandMore,
-  OpenInNew,
-  Dashboard,
   PlaylistAdd,
   TaskAlt,
+  PlayArrow,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -216,15 +215,6 @@ const SprintDropSlot: React.FC<SprintDropSlotProps> = ({
             <Typography variant="subtitle2" fontWeight={700}>
               {sprint.name}
             </Typography>
-            <Tooltip title="Open Sprint Board">
-              <IconButton
-                size="small"
-                onClick={() => onOpenBoard(sprint.id)}
-                sx={{ p: 0.25, color: 'text.disabled', '&:hover': { color: 'primary.main' } }}
-              >
-                <OpenInNew sx={{ fontSize: 13 }} />
-              </IconButton>
-            </Tooltip>
             {sprint.status !== 'completed' && (
               <Tooltip title="Delete sprint">
                 <IconButton
@@ -805,6 +795,18 @@ const SprintPlanningPage: React.FC = () => {
     onError: () => toast.error('Failed to delete sprint'),
   });
 
+  // ── Start the first planning sprint ──
+  const startSprintMutation = useMutation({
+    mutationFn: (sprintId: string) => sprintsApi.start(sprintId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sprints', projectId] });
+      toast.success('Sprint started!');
+      const target = allSprints.find((s) => s.status === 'active') ?? allSprints[0];
+      if (target) navigate(`/projects/${projectId}/sprints/${target.id}`);
+    },
+    onError: () => toast.error('Failed to start sprint'),
+  });
+
   // ── Generate tasks via AI for one or more stories ──
   const handleGenerateTasksForSprint = useCallback(async (storyIds: string[]) => {
     // Mark all as loading
@@ -1061,28 +1063,33 @@ const SprintPlanningPage: React.FC = () => {
               </Tooltip>
             )}
 
-            {/* ── Go to Sprint Board ── shown once sprints exist */}
-            {allSprints.length > 0 && (
-              <Tooltip title="Open the Sprint Board to start, track, and complete sprints">
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<Dashboard />}
-                  endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-                  onClick={() => {
-                    // Prefer the active sprint; fall back to the first sprint.
-                    // allSprints.length > 0 is guaranteed by the parent condition.
-                    const target =
-                      allSprints.find((s) => s.status === 'active') ??
-                      allSprints[0]!;
-                    navigate(`/projects/${projectId}/sprints/${target.id}`);
-                  }}
-                  sx={{ fontWeight: 600 }}
-                >
-                  Sprint Board
-                </Button>
-              </Tooltip>
-            )}
+            {/* ── Start Sprint ── shown once sprints exist */}
+            {allSprints.length > 0 && (() => {
+              const planningSprint = allSprints.find((s) => s.status === 'planning') ?? null;
+              const activeSprint   = allSprints.find((s) => s.status === 'active')   ?? null;
+              if (activeSprint) return null; // already active
+              if (!planningSprint) return null;
+              return (
+                <Tooltip title="Start the first sprint and open the Sprint Board">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="success"
+                      startIcon={
+                        startSprintMutation.isPending
+                          ? <CircularProgress size={16} color="inherit" />
+                          : <PlayArrow />
+                      }
+                      onClick={() => startSprintMutation.mutate(planningSprint.id)}
+                      disabled={startSprintMutation.isPending}
+                      sx={{ fontWeight: 600 }}
+                    >
+                      {startSprintMutation.isPending ? 'Starting…' : 'Start Sprint'}
+                    </Button>
+                  </span>
+                </Tooltip>
+              );
+            })()}
 
             <Tooltip
               title={aiPlanMutation.isPending ? 'AI is analysing and allocating stories — this takes 30–90 seconds' : ''}
