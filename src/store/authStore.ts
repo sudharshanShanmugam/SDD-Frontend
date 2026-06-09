@@ -46,11 +46,11 @@ export const ROLE_NAV_ACCESS: Record<AppRole, string[]> = {
   project_manager:  ['dashboard','workspaces','documents','requirements','stories','sprints','tasks','qa','releases','approvals','ai-workflow'],
   business_analyst: ['dashboard','workspaces','documents','requirements','stories','sprints','tasks','qa','releases','approvals','ai-workflow'],
   tech_lead:        ['dashboard','workspaces','documents','requirements','stories','sprints','tasks','qa','releases','ai-workflow'],
-  developer:        ['dashboard','workspaces','sprints','tasks'],
-  qa_engineer:      ['dashboard','workspaces','sprints','tasks','qa','releases'],
-  stakeholder:      ['dashboard','workspaces','requirements','stories','sprints','tasks'],
-  viewer:           ['dashboard','workspaces','requirements','stories','sprints','tasks'],
-  member:           ['dashboard','workspaces','sprints','tasks'],
+  developer:        ['workspaces','sprints','tasks'],
+  qa_engineer:      ['workspaces','sprints','tasks','qa','releases'],
+  stakeholder:      ['workspaces','requirements','stories','sprints','tasks'],
+  viewer:           ['workspaces','requirements','stories','sprints','tasks'],
+  member:           ['workspaces','sprints','tasks'],
 };
 
 export function canAccessNav(role: AppRole, page: string): boolean {
@@ -168,15 +168,19 @@ export const useAuthStore = create<AuthState>()(
         },
 
         setAuthFromLogin: (loginResp) => {
-          const userData = loginResp.user;
-          if (!userData) return;
-          const user = roleToAuthUser(userData);
           const tokens: AuthTokens = {
             accessToken:  loginResp.access_token,
             refreshToken: loginResp.refresh_token,
             expiresAt:    new Date(Date.now() + loginResp.expires_in * 1000).toISOString(),
             tokenType:    'Bearer',
           };
+          const userData = loginResp.user;
+          if (!userData) {
+            // Token refresh response — update tokens only, preserve existing user/org
+            set((state) => { state.tokens = tokens; });
+            return;
+          }
+          const user = roleToAuthUser(userData);
           set((state) => {
             state.user            = user;
             state.tokens          = tokens;

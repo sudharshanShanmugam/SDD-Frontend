@@ -31,6 +31,7 @@ import {
 import {
   Close,
   Delete,
+  BugReportOutlined,
   UndoOutlined,
   RedoOutlined,
   FormatBold,
@@ -56,9 +57,12 @@ import TaskListExt from '@tiptap/extension-task-list'
 import TaskItemExt from '@tiptap/extension-task-item'
 import { tasksApi } from '@/api/tasks'
 import { projectsApi } from '@/api/projects'
+import { storiesApi } from '@/api/stories'
 import { useUIStore } from '@store/uiStore'
 import type { Task, TaskStatus, TaskType, TimeLog } from '@/types/task.types'
 import type { Priority } from '@/types/common.types'
+import type { TestGenerationResult } from '@/api/stories'
+import { TestGenerationDrawer } from './TestGenerationDrawer'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -516,6 +520,10 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState(0)
   const [editTitle, setEditTitle] = useState<string | null>(null)
+  const [testDrawerOpen, setTestDrawerOpen] = useState(false)
+  const [testResult, setTestResult] = useState<TestGenerationResult | null>(null)
+  const [testLoading, setTestLoading] = useState(false)
+  const [testError, setTestError] = useState<string | null>(null)
   const [descHtml, setDescHtml] = useState<string>('')
   const [descDirty, setDescDirty] = useState(false)
   const [editLoggedHours, setEditLoggedHours] = useState(false)
@@ -585,6 +593,26 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
     }
   }, [descHtml, descDirty, patch, toast])
 
+  const handleGenerateTests = useCallback(async () => {
+    const storyId = (task as any)?.storyId ?? (task as any)?.story_id
+    if (!storyId) {
+      toast.error('This task is not linked to a user story')
+      return
+    }
+    setTestResult(null)
+    setTestError(null)
+    setTestLoading(true)
+    setTestDrawerOpen(true)
+    try {
+      const result = await storiesApi.generateTests(storyId)
+      setTestResult(result)
+    } catch {
+      setTestError('Failed to generate test cases. Please try again.')
+    } finally {
+      setTestLoading(false)
+    }
+  }, [task, toast])
+
   return (
     <Drawer
       anchor="right"
@@ -615,7 +643,16 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
             sx={{ fontFamily: 'monospace', fontWeight: 700, bgcolor: 'primary.main' + '18', color: 'primary.main', fontSize: '0.75rem' }}
           />
         ) : <Box />}
-        <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
+        <Stack direction="row" alignItems="center" spacing={0.5}>
+          {task && (task as any).storyId && (
+            <Tooltip title="Generate Test Cases">
+              <IconButton size="small" onClick={handleGenerateTests} disabled={testLoading} color="primary">
+                {testLoading ? <CircularProgress size={16} /> : <BugReportOutlined fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          )}
+          <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
+        </Stack>
       </Box>
 
       {isLoading || !task ? (
@@ -717,7 +754,7 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
                 size="small"
                 fullWidth
                 value={task.startedAt ? task.startedAt.slice(0, 10) : ''}
-                onChange={(e) => patch({ startedAt: e.target.value || null } as any)}
+                onChange={(e) => patch({ started_at: e.target.value || null } as any)}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
             </Box>
@@ -962,6 +999,14 @@ export function TaskDetailDrawer({ taskId, onClose, onDeleted, onStatusChanged }
           </Button>
         </Box>
       )}
+
+      <TestGenerationDrawer
+        open={testDrawerOpen}
+        loading={testLoading}
+        result={testResult}
+        error={testError}
+        onClose={() => setTestDrawerOpen(false)}
+      />
     </Drawer>
   )
 }

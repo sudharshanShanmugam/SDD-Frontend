@@ -33,7 +33,7 @@ import {
   Add,
   DragIndicator,
   Science,
-  AutoAwesome,
+  CheckCircle,
 } from '@mui/icons-material'
 import {
   DndContext,
@@ -504,7 +504,9 @@ export function TaskBoardPage(): React.JSX.Element {
   const [testLoading]       = useState(false)
   const [testError]           = useState<string | null>(null)
 
-  // Fetch sprints — find active or planning sprint
+  const { toast } = useUIStore()
+
+  // Fetch sprints to find the active or planning sprint
   const { data: sprintsData } = useQuery({
     queryKey: ['sprints', projectId],
     queryFn: () => sprintsApi.list(projectId!),
@@ -512,17 +514,24 @@ export function TaskBoardPage(): React.JSX.Element {
     staleTime: 60_000,
   })
   const sprints: any[] = (sprintsData as any)?.data ?? []
-  const activeSprint  = sprints.find((s: any) => s.status === 'active')  ?? null
-  const planningSprint = sprints.find((s: any) => s.status === 'planning') ?? null
-  // currentSprint drives which stories/tasks we fetch
-  const currentSprint = activeSprint ?? planningSprint ?? null
-  const isPlanning = !activeSprint && !!planningSprint
+  const activeSprint   = sprints.find((s: any) => s.status === 'active') ?? null
 
-  // Fetch stories in the current sprint so we can filter tasks client-side
+  // Complete sprint mutation
+  const completeSprintMutation = useMutation({
+    mutationFn: (sprintId: string) => sprintsApi.complete(sprintId, 'backlog'),
+    onSuccess: () => {
+      toast.success('Sprint completed!')
+      void queryClient.invalidateQueries({ queryKey: ['sprints', projectId] })
+      void queryClient.invalidateQueries({ queryKey: ['tasks', 'board', projectId] })
+    },
+    onError: () => toast.error('Failed to complete sprint'),
+  })
+
+  // Fetch stories in the active sprint so we can filter tasks client-side
   const { data: sprintStoriesData } = useQuery({
-    queryKey: ['sprint-stories', currentSprint?.id],
-    queryFn: () => storiesApi.list(projectId!, { sprint_id: currentSprint!.id }),
-    enabled: !!currentSprint && !!projectId,
+    queryKey: ['sprint-stories', activeSprint?.id],
+    queryFn: () => storiesApi.list(projectId!, { sprint_id: activeSprint!.id }),
+    enabled: !!activeSprint && !!projectId,
     staleTime: 30_000,
   })
   const sprintStoryIds = useMemo(() => {
@@ -530,7 +539,7 @@ export function TaskBoardPage(): React.JSX.Element {
     return new Set<string>(ids)
   }, [sprintStoriesData])
 
-  // Always fetch ALL project tasks — filter client-side to current sprint stories
+  // Always fetch ALL project tasks — filter client-side to active sprint stories
   const { data, isLoading } = useQuery({
     queryKey: ['tasks', 'board', projectId],
     queryFn: () => tasksApi.listByProject(projectId!),
@@ -550,12 +559,12 @@ export function TaskBoardPage(): React.JSX.Element {
 
   const allTasks: Task[] = (data as any)?.data ?? []
 
-  // Show tasks for stories in the current sprint (planning or active)
+  // Show tasks only when a sprint is active; nothing if no active sprint
   const tasks: Task[] = useMemo(() => {
-    if (!currentSprint) return []
+    if (!activeSprint) return []
     if (sprintStoryIds.size === 0) return []
     return allTasks.filter((t) => sprintStoryIds.has(t.storyId as string))
-  }, [allTasks, currentSprint, sprintStoryIds])
+  }, [allTasks, activeSprint, sprintStoryIds])
 
   const tasksByColumn = useMemo(() => {
     const map: Record<TaskStatus, Task[]> = {
@@ -613,96 +622,12 @@ export function TaskBoardPage(): React.JSX.Element {
     void queryClient.invalidateQueries({ queryKey: ['tasks', 'board', projectId] })
   }, [queryClient, projectId])
 
-  // ── Setup tasks for ALL sprint-assigned stories in the project ──
-  const [settingUp, setSettingUp] = useState(false)
-  const [setupProgress, setSetupProgress] = useState('')
-  const { toast } = useUIStore()
-
-  const handleSetupSprintTasks = useCallback(async () => {
-    if (!projectId) return
-    setSettingUp(true)
-    setSetupProgress('Loading stories…')
-
-    try {
-      // 1. Fetch ALL project stories that are assigned to a sprint
-      const storiesResp = await storiesApi.list(projectId, { page_size: 500 } as any)
-      const allStories: StorySummary[] = (storiesResp as any)?.data ?? []
-      const sprintStories = allStories.filter((s) => !!(s as any).sprintId)
-
-      if (sprintStories.length === 0) {
-        toast.warning('No stories assigned to sprints yet. Run AI Sprint Planning first.')
-        return
-      }
-
-      // 2. Find which stories already have tasks (to avoid duplicates)
-      const tasksResp = await tasksApi.listByProject(projectId)
-      const existingStoryIds = new Set<string>(
-        ((tasksResp as any)?.data ?? []).map((t: any) => t.storyId).filter(Boolean)
-      )
-      const needsTasks = sprintStories.filter((s) => !existingStoryIds.has(s.id))
-
-      if (needsTasks.length === 0) {
-        toast.success('All stories already have tasks!')
-        return
-      }
-
-      // 3. Create tasks in batches of 5 stories at a time
-      const BATCH = 5
-      let created = 0
-      for (let i = 0; i < needsTasks.length; i += BATCH) {
-        const batch = needsTasks.slice(i, i + BATCH)
-        setSetupProgress(`Creating tasks… ${Math.min(i + BATCH, needsTasks.length)}/${needsTasks.length} stories`)
-
-        await Promise.all(
-          batch.flatMap((story) => {
-            const t = story.title
-            const id = story.identifier
-            return [
-              tasksApi.create(story.id, {
-                title: `Implement: ${t}`,
-                type: 'development' as TaskType,
-                priority: 'high',
-                estimatedHours: 4,
-                description: `Implement the feature for [${id}] ${t}. Ensure all acceptance criteria are met.`,
-              }),
-              tasksApi.create(story.id, {
-                title: `Test: ${t}`,
-                type: 'testing' as TaskType,
-                priority: 'medium',
-                estimatedHours: 2,
-                description: `Write and run test cases for [${id}] ${t}. Cover happy path, edge cases, and error scenarios.`,
-              }),
-              tasksApi.create(story.id, {
-                title: `Review & Document: ${t}`,
-                type: 'documentation' as TaskType,
-                priority: 'low',
-                estimatedHours: 1,
-                description: `Code review and documentation for [${id}] ${t}. Verify implementation matches requirements.`,
-              }),
-            ]
-          })
-        )
-        created += batch.length * 3
-      }
-
-      toast.success(`Created ${created} tasks for ${needsTasks.length} stories`)
-      void queryClient.invalidateQueries({ queryKey: ['tasks', 'board', projectId] })
-    } catch (err) {
-      toast.error('Failed to create some tasks')
-    } finally {
-      setSettingUp(false)
-      setSetupProgress('')
-    }
-  }, [projectId, queryClient, toast])
-
   return (
     <Box>
       <PageHeader
         title="Task Board"
         subtitle={activeSprint
-          ? `${activeSprint.name} — active sprint`
-          : isPlanning
-          ? `${planningSprint!.name} — sprint backlog (start sprint to begin work)`
+          ? `${activeSprint.name} — showing tasks for active sprint`
           : 'Drag tasks between columns to update status — click a card to view details'
         }
         breadcrumbs={[
@@ -712,21 +637,18 @@ export function TaskBoardPage(): React.JSX.Element {
         actions={
           <Stack direction="row" spacing={1} alignItems="center">
             {activeSprint && (
-              <Chip label={`${activeSprint.name} (Active)`} size="small" color="primary" sx={{ height: 24, fontSize: '0.72rem' }} />
+              <Button
+                variant="outlined"
+                size="small"
+                color="secondary"
+                startIcon={completeSprintMutation.isPending ? <CircularProgress size={14} color="inherit" /> : <CheckCircle />}
+                disabled={completeSprintMutation.isPending}
+                onClick={() => completeSprintMutation.mutate(activeSprint.id)}
+                sx={{ fontWeight: 600 }}
+              >
+                {completeSprintMutation.isPending ? 'Completing…' : 'Complete Sprint'}
+              </Button>
             )}
-            {isPlanning && (
-              <Chip label={`${planningSprint!.name} (Planning)`} size="small" color="warning" sx={{ height: 24, fontSize: '0.72rem' }} />
-            )}
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={settingUp ? <CircularProgress size={14} color="inherit" /> : <AutoAwesome />}
-              disabled={settingUp}
-              onClick={handleSetupSprintTasks}
-              sx={{ fontWeight: 600 }}
-            >
-              {settingUp ? (setupProgress || 'Creating…') : 'Setup All Sprint Tasks'}
-            </Button>
             <Button variant="contained" startIcon={<Add />} size="small" onClick={() => setCreateOpen(true)}>
               Add Task
             </Button>
@@ -741,135 +663,57 @@ export function TaskBoardPage(): React.JSX.Element {
 
       {isLoading && <LinearProgress />}
 
-      {/* ── Planning sprint: flat backlog list ── */}
-      {!isLoading && isPlanning && (
-        <>
-          {tasks.length > 0 ? (
-            <Box sx={{ px: 0, pt: 1, pb: 3 }}>
-              <Box sx={{
-                border: '1px solid', borderColor: 'divider', borderRadius: 2,
-                overflow: 'hidden', bgcolor: 'background.paper',
-              }}>
-                {/* Header */}
-                <Box sx={{
-                  px: 2, py: 1.25, bgcolor: 'action.hover',
-                  borderBottom: '1px solid', borderColor: 'divider',
-                  display: 'flex', alignItems: 'center', gap: 1,
-                }}>
-                  <Typography variant="subtitle2" fontWeight={700}>Sprint Backlog</Typography>
-                  <Chip label={tasks.length} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }} />
-                  <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                    Start the sprint to move tasks to the board
-                  </Typography>
-                </Box>
-                {/* Task rows */}
-                {tasks.map((task, idx) => (
-                  <Box
-                    key={task.id}
-                    onClick={() => handleDetailClick(task.id)}
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: '60px 1fr 80px 64px',
-                      gap: 2, px: 2, py: 1,
-                      borderBottom: idx < tasks.length - 1 ? '1px solid' : 'none',
-                      borderColor: 'divider',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      '&:hover': { bgcolor: 'action.hover' },
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'primary.main', fontWeight: 600 }}>
-                      {task.identifier || '—'}
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {task.title}
-                    </Typography>
-                    <Chip
-                      label="Backlog"
-                      size="small"
-                      sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'action.selected' }}
-                    />
-                    {task.estimatedHours != null && (
-                      <Typography variant="caption" color="text.secondary" textAlign="right">
-                        {task.estimatedHours}h
-                      </Typography>
-                    )}
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-          ) : (
-            <EmptyState
-              variant="no-data"
-              title={`${planningSprint!.name} — no tasks yet`}
-              description="Generate tasks from the Sprint Planning tab, then start the sprint to begin working."
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 2,
+            overflowX: 'auto',
+            pb: 3,
+            pt: 1,
+            '&::-webkit-scrollbar': { height: 6 },
+            '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+            '&::-webkit-scrollbar-thumb': {
+              bgcolor: 'divider',
+              borderRadius: 3,
+              '&:hover': { bgcolor: 'action.selected' },
+            },
+          }}
+        >
+          {COLUMNS.map((column) => (
+            <KanbanColumn
+              key={column.id}
+              column={column}
+              tasks={tasksByColumn[column.id]}
+              stories={[]}
+              sprintMode={false}
+              onTaskClick={handleDetailClick}
+              onStoryClick={handleStoryClick}
+              isUpdating={updatingId !== null && tasksByColumn[column.id].some((t) => t.id === updatingId)}
             />
-          )}
-        </>
-      )}
+          ))}
+        </Box>
 
-      {/* ── Active sprint: full kanban ── */}
-      {!isPlanning && (
-        <>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <Box
-              sx={{
-                display: 'flex',
-                gap: 2,
-                overflowX: 'auto',
-                pb: 3,
-                pt: 1,
-                '&::-webkit-scrollbar': { height: 6 },
-                '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-                '&::-webkit-scrollbar-thumb': {
-                  bgcolor: 'divider',
-                  borderRadius: 3,
-                  '&:hover': { bgcolor: 'action.selected' },
-                },
-              }}
-            >
-              {COLUMNS.map((column) => (
-                <KanbanColumn
-                  key={column.id}
-                  column={column}
-                  tasks={tasksByColumn[column.id]}
-                  stories={[]}
-                  sprintMode={false}
-                  onTaskClick={handleDetailClick}
-                  onStoryClick={handleStoryClick}
-                  isUpdating={updatingId !== null && tasksByColumn[column.id].some((t) => t.id === updatingId)}
-                />
-              ))}
-            </Box>
+        <DragOverlay dropAnimation={null}>
+          {activeTask ? <TaskCardView task={activeTask} dragging /> : null}
+        </DragOverlay>
+      </DndContext>
 
-            <DragOverlay dropAnimation={null}>
-              {activeTask ? <TaskCardView task={activeTask} dragging /> : null}
-            </DragOverlay>
-          </DndContext>
-
-          {!isLoading && tasks.length === 0 && (
-            <EmptyState
-              variant="no-data"
-              title={activeSprint ? `No tasks in ${activeSprint.name} yet` : 'No active sprint'}
-              description={
-                !currentSprint
-                  ? 'Generate tasks from Sprint Planning, then start the sprint to see them here.'
-                  : activeSprint && sprintStoryIds.size > 0
-                  ? `${activeSprint.name} has ${sprintStoryIds.size} stories but no tasks. Create default tasks instantly.`
-                  : 'Tasks track the work inside a user story. Create one with Add Task or generate from Sprint Planning.'
-              }
-              action={activeSprint ? {
-                label: settingUp ? (setupProgress || 'Creating tasks…') : 'Setup All Sprint Tasks',
-                onClick: handleSetupSprintTasks,
-              } : undefined}
-            />
-          )}
-        </>
+      {!isLoading && tasks.length === 0 && (
+        <EmptyState
+          variant="no-data"
+          title={activeSprint ? `No tasks in ${activeSprint.name} yet` : 'No tasks yet'}
+          description={
+            activeSprint && sprintStoryIds.size > 0
+              ? `${activeSprint.name} has ${sprintStoryIds.size} stories but no tasks. Create default tasks (Implementation, Tests, Review) for each story instantly.`
+              : 'Tasks track the work inside a user story. Create one with Add Task, or generate them from Sprint Planning.'
+          }
+        />
       )}
 
       {/* ── Create Task dialog ── */}

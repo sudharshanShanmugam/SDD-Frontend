@@ -71,6 +71,17 @@ function PageSpinner(): React.JSX.Element {
 }
 
 // ============================================================
+// RootRedirect — sends each role to their home page
+// ============================================================
+
+function RootRedirect(): React.JSX.Element {
+  const canAccess = useAuthStore(s => s.canAccess)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return <Navigate to={canAccess('dashboard') ? '/dashboard' : '/workspaces'} replace />
+}
+
+// ============================================================
 // ProtectedRoute
 // ============================================================
 
@@ -127,7 +138,7 @@ function ProjectRouteGuard({ children }: { children: ReactNode }): React.JSX.Ele
     <RoleGuard
       permissions={['project:read']}
       projectId={projectId}
-      fallback={<Navigate to="/dashboard" replace />}
+      fallback={<Navigate to="/workspaces" replace />}
     >
       {children}
     </RoleGuard>
@@ -145,8 +156,8 @@ export function AppRouter(): React.JSX.Element {
       <Route path="/login" element={<React.Suspense fallback={<PageSpinner />}><LoginPage /></React.Suspense>} />
       <Route path="/unauthorized" element={<React.Suspense fallback={<PageSpinner />}><UnauthorizedPage /></React.Suspense>} />
 
-      {/* Root redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      {/* Root redirect — role-aware */}
+      <Route path="/" element={<RootRedirect />} />
 
       {/* Protected routes under AppLayout */}
       <Route

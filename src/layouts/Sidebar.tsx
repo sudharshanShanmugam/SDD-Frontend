@@ -199,12 +199,12 @@ export default function Sidebar({ collapsed }: SidebarProps): React.JSX.Element 
 
   const mainNav: NavSection = {
     items: [
-      {
+      ...(canAccess('dashboard') ? [{
         label: 'Dashboard',
         href: '/dashboard',
         icon: <LayoutDashboard />,
         exact: true,
-      },
+      }] : []),
       {
         label: 'Workspaces',
         href: '/workspaces',

@@ -110,6 +110,8 @@ interface SprintDropSlotProps {
   onOpenBoard: (sprintId: string) => void;
   onDelete: (sprintId: string) => void;
   onGenerateTasksForSprint: (storyIds: string[]) => void;
+  onStartSprint: (sprintId: string, stories: StorySummary[]) => void;
+  startingSprintId: string | null;
   taskGenStatus: Record<string, 'idle' | 'loading' | 'done' | 'error'>;
   onCreateTask: (storyId: string, data: { title: string; type: TaskType; estimatedHours?: number }) => Promise<void>;
 }
@@ -127,9 +129,10 @@ const SprintDropSlot: React.FC<SprintDropSlotProps> = ({
   sprint,
   velocity,
   activeStory,
-  onOpenBoard,
   onDelete,
   onGenerateTasksForSprint,
+  onStartSprint,
+  startingSprintId,
   taskGenStatus,
   onCreateTask,
 }) => {
@@ -138,6 +141,34 @@ const SprintDropSlot: React.FC<SprintDropSlotProps> = ({
   const [taskType, setTaskType] = React.useState<TaskType>('development');
   const [taskHours, setTaskHours] = React.useState('');
   const [saving, setSaving] = React.useState(false);
+
+  // Sprint-level custom task form
+  const [addTaskOpen, setAddTaskOpen] = React.useState(false);
+  const [customTaskStoryId, setCustomTaskStoryId] = React.useState('');
+  const [customTaskTitle, setCustomTaskTitle] = React.useState('');
+  const [customTaskType, setCustomTaskType] = React.useState<TaskType>('development');
+  const [customTaskHours, setCustomTaskHours] = React.useState('');
+  const [customTaskSaving, setCustomTaskSaving] = React.useState(false);
+
+  const handleCustomAddTask = async () => {
+    if (!customTaskTitle.trim() || !customTaskStoryId) return;
+    setCustomTaskSaving(true);
+    try {
+      const parsed = customTaskHours ? parseFloat(customTaskHours) : undefined;
+      await onCreateTask(customTaskStoryId, {
+        title: customTaskTitle.trim(),
+        type: customTaskType,
+        ...(parsed !== undefined ? { estimatedHours: parsed } : {}),
+      });
+      setCustomTaskTitle('');
+      setCustomTaskHours('');
+      setCustomTaskStoryId('');
+      setCustomTaskType('development');
+      setAddTaskOpen(false);
+    } finally {
+      setCustomTaskSaving(false);
+    }
+  };
 
   const handleAddTask = async (storyId: string) => {
     if (!taskTitle.trim()) return;
@@ -215,7 +246,13 @@ const SprintDropSlot: React.FC<SprintDropSlotProps> = ({
             <Typography variant="subtitle2" fontWeight={700}>
               {sprint.name}
             </Typography>
-            {sprint.status !== 'completed' && (
+            {sprint.status === 'completed' && (
+              <Chip label="Completed" size="small" color="success" sx={{ height: 18, fontSize: '0.65rem' }} />
+            )}
+            {sprint.status === 'active' && (
+              <Chip label="Active" size="small" color="primary" sx={{ height: 18, fontSize: '0.65rem' }} />
+            )}
+            {sprint.status !== 'completed' && sprint.status !== 'active' && (
               <Tooltip title="Delete sprint">
                 <IconButton
                   size="small"
@@ -335,32 +372,54 @@ const SprintDropSlot: React.FC<SprintDropSlotProps> = ({
         </Typography>
 
         {/* Generate Tasks for entire sprint */}
-        {sprint.assignedStories.length > 0 && (
-          <Tooltip title="AI-generate tasks for all stories in this sprint">
-            <span>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={
-                  sprint.assignedStories.some((s) => taskGenStatus[s.id] === 'loading')
-                    ? <CircularProgress size={12} color="inherit" />
-                    : sprint.assignedStories.every((s) => taskGenStatus[s.id] === 'done')
-                    ? <TaskAlt sx={{ fontSize: 14 }} />
-                    : <AutoAwesome sx={{ fontSize: 14 }} />
-                }
-                disabled={sprint.assignedStories.some((s) => taskGenStatus[s.id] === 'loading')}
-                onClick={() => onGenerateTasksForSprint(sprint.assignedStories.map((s) => s.id))}
-                sx={{ height: 22, fontSize: '0.68rem', px: 1, fontWeight: 600 }}
-              >
-                {sprint.assignedStories.every((s) => taskGenStatus[s.id] === 'done')
-                  ? 'Tasks Generated'
-                  : sprint.assignedStories.some((s) => taskGenStatus[s.id] === 'loading')
-                  ? 'Generating…'
-                  : 'Generate Tasks'}
-              </Button>
-            </span>
-          </Tooltip>
-        )}
+        {sprint.assignedStories.length > 0 && (() => {
+          const allDone    = sprint.assignedStories.every((s) => taskGenStatus[s.id] === 'done');
+          const anyLoading = sprint.assignedStories.some((s) => taskGenStatus[s.id] === 'loading');
+          const isStarting = startingSprintId === sprint.id;
+          return (
+            <>
+              <Tooltip title="AI-generate tasks for all stories in this sprint">
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={
+                      anyLoading
+                        ? <CircularProgress size={12} color="inherit" />
+                        : allDone
+                        ? <TaskAlt sx={{ fontSize: 14 }} />
+                        : <AutoAwesome sx={{ fontSize: 14 }} />
+                    }
+                    disabled={anyLoading}
+                    onClick={() => onGenerateTasksForSprint(sprint.assignedStories.map((s) => s.id))}
+                    sx={{ height: 22, fontSize: '0.68rem', px: 1, fontWeight: 600 }}
+                  >
+                    {allDone ? 'Tasks Generated' : anyLoading ? 'Generating…' : 'Generate Tasks'}
+                  </Button>
+                </span>
+              </Tooltip>
+
+              {/* Start Sprint — visible on any planning sprint */}
+              {sprint.status === 'planning' && (
+                <Tooltip title="Start this sprint and open the Task Board">
+                  <span>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="success"
+                      startIcon={isStarting ? <CircularProgress size={12} color="inherit" /> : <PlayArrow sx={{ fontSize: 14 }} />}
+                      disabled={isStarting}
+                      onClick={() => onStartSprint(sprint.id, sprint.assignedStories)}
+                      sx={{ height: 22, fontSize: '0.68rem', px: 1, fontWeight: 700 }}
+                    >
+                      {isStarting ? 'Starting…' : 'Start Sprint'}
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
+            </>
+          );
+        })()}
       </Box>
 
       {/* ── Story rows ── */}
@@ -583,6 +642,100 @@ const SprintDropSlot: React.FC<SprintDropSlotProps> = ({
           </Box>
         )}
       </Box>
+
+      {/* ── Add Custom Task ── */}
+      {sprint.assignedStories.length > 0 && (
+        <Box sx={{ px: 2, pb: 1.5 }}>
+          {!addTaskOpen ? (
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<Add sx={{ fontSize: 14 }} />}
+              onClick={() => { setAddTaskOpen(true); setCustomTaskStoryId(sprint.assignedStories[0]?.id ?? ''); }}
+              sx={{ fontSize: '0.72rem', color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+            >
+              Add Task
+            </Button>
+          ) : (
+            <Box sx={{
+              border: '1px solid', borderColor: 'primary.light', borderRadius: 1.5,
+              p: 1.25, display: 'flex', flexDirection: 'column', gap: 1,
+              bgcolor: 'primary.50',
+            }}>
+              <Typography variant="caption" fontWeight={700} color="primary.main">New Task</Typography>
+
+              {/* Story picker */}
+              <select
+                value={customTaskStoryId}
+                onChange={(e) => setCustomTaskStoryId(e.target.value)}
+                style={{
+                  width: '100%', fontSize: '0.75rem', padding: '5px 8px',
+                  border: '1px solid #ccc', borderRadius: 4, background: 'inherit', color: 'inherit',
+                }}
+              >
+                {sprint.assignedStories.map((s) => (
+                  <option key={s.id} value={s.id}>{s.identifier} — {s.title}</option>
+                ))}
+              </select>
+
+              {/* Title */}
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Task title…"
+                value={customTaskTitle}
+                onChange={(e) => setCustomTaskTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCustomAddTask(); }}
+                autoFocus
+                sx={{ '& .MuiInputBase-input': { fontSize: '0.8rem', py: 0.75 } }}
+              />
+
+              {/* Type + Hours */}
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <select
+                  value={customTaskType}
+                  onChange={(e) => setCustomTaskType(e.target.value as TaskType)}
+                  style={{
+                    flex: 1, fontSize: '0.75rem', padding: '4px 6px',
+                    border: '1px solid #ccc', borderRadius: 4, background: 'inherit', color: 'inherit',
+                  }}
+                >
+                  {TASK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+                <TextField
+                  size="small"
+                  type="number"
+                  placeholder="Hrs"
+                  value={customTaskHours}
+                  onChange={(e) => setCustomTaskHours(e.target.value)}
+                  slotProps={{ htmlInput: { min: 0.5, step: 0.5 } }}
+                  sx={{ width: 72, '& .MuiInputBase-input': { fontSize: '0.8rem', py: 0.75 } }}
+                />
+              </Box>
+
+              {/* Actions */}
+              <Box sx={{ display: 'flex', gap: 0.75 }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={!customTaskTitle.trim() || !customTaskStoryId || customTaskSaving}
+                  onClick={handleCustomAddTask}
+                  sx={{ fontSize: '0.72rem', py: 0.5, minWidth: 0 }}
+                >
+                  {customTaskSaving ? <CircularProgress size={12} color="inherit" /> : 'Add'}
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => { setAddTaskOpen(false); setCustomTaskTitle(''); setCustomTaskHours(''); }}
+                  sx={{ fontSize: '0.72rem', py: 0.5, minWidth: 0 }}
+                >
+                  Cancel
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      )}
     </Paper>
   );
 };
@@ -630,9 +783,8 @@ const SprintPlanningPage: React.FC = () => {
   // ── Queries ──
   const { data: storiesData, isLoading: storiesLoading, isError: storiesError } = useQuery({
     queryKey: ['backlog-stories', projectId],
-    queryFn: () => storiesApi.list(projectId!, { status: 'approved' }),
+    queryFn: () => storiesApi.list(projectId!, { page_size: 500 } as any),
     enabled: !!projectId,
-    // Keep data fresh but avoid unnecessary re-renders
     staleTime: 30_000,
   });
 
@@ -795,17 +947,48 @@ const SprintPlanningPage: React.FC = () => {
     onError: () => toast.error('Failed to delete sprint'),
   });
 
-  // ── Start the first planning sprint ──
-  const startSprintMutation = useMutation({
-    mutationFn: (sprintId: string) => sprintsApi.start(sprintId),
-    onSuccess: () => {
+  // ── Start a planning sprint (auto-generates tasks first) ──
+  const [startingSprintId, setStartingSprintId] = useState<string | null>(null);
+
+  const handleStartSprint = useCallback(async (sprintId: string, stories: StorySummary[]) => {
+    setStartingSprintId(sprintId);
+    try {
+      // 1. Fetch existing tasks to avoid duplicates
+      const existingTasksResp = await tasksApi.listByProject(projectId!);
+      const existingStoryIds = new Set<string>(
+        ((existingTasksResp as any)?.data ?? []).map((t: any) => t.storyId).filter(Boolean)
+      );
+
+      // 2. Create tasks synchronously for stories that don't have any yet
+      const needsTasks = stories.filter((s) => !existingStoryIds.has(s.id));
+      if (needsTasks.length > 0) {
+        for (const story of needsTasks) {
+          await tasksApi.create(story.id, {
+            title: `Implement: ${story.title}`,
+            type: 'development' as TaskType,
+            priority: 'high',
+            estimatedHours: 4,
+          });
+          await tasksApi.create(story.id, {
+            title: `Review: ${story.title}`,
+            type: 'development' as TaskType,
+            priority: 'medium',
+            estimatedHours: 2,
+          });
+        }
+      }
+
+      // 3. Start the sprint
+      await sprintsApi.start(sprintId);
       queryClient.invalidateQueries({ queryKey: ['sprints', projectId] });
       toast.success('Sprint started!');
-      const target = allSprints.find((s) => s.status === 'active') ?? allSprints[0];
-      if (target) navigate(`/projects/${projectId}/sprints/${target.id}`);
-    },
-    onError: () => toast.error('Failed to start sprint'),
-  });
+      navigate(`/projects/${projectId}/tasks`);
+    } catch {
+      toast.error('Failed to start sprint');
+    } finally {
+      setStartingSprintId(null);
+    }
+  }, [projectId, queryClient, navigate, toast]);
 
   // ── Generate tasks via AI for one or more stories ──
   const handleGenerateTasksForSprint = useCallback(async (storyIds: string[]) => {
@@ -881,7 +1064,9 @@ const SprintPlanningPage: React.FC = () => {
     ? (activeItem.data.current as { story: StorySummary } | undefined)?.story ?? null
     : null;
 
-  const backlogStories = allStories.filter((s) => !assignments[s.id]);
+  const backlogStories = allStories.filter((s) =>
+    !assignments[s.id] && s.status !== 'done' && s.status !== 'cancelled'
+  );
 
   const q = backlogSearch.trim().toLowerCase();
   const filteredBacklog = q
@@ -1062,34 +1247,6 @@ const SprintPlanningPage: React.FC = () => {
                 </Button>
               </Tooltip>
             )}
-
-            {/* ── Start Sprint ── shown once sprints exist */}
-            {allSprints.length > 0 && (() => {
-              const planningSprint = allSprints.find((s) => s.status === 'planning') ?? null;
-              const activeSprint   = allSprints.find((s) => s.status === 'active')   ?? null;
-              if (activeSprint) return null; // already active
-              if (!planningSprint) return null;
-              return (
-                <Tooltip title="Start the first sprint and open the Sprint Board">
-                  <span>
-                    <Button
-                      variant="outlined"
-                      color="success"
-                      startIcon={
-                        startSprintMutation.isPending
-                          ? <CircularProgress size={16} color="inherit" />
-                          : <PlayArrow />
-                      }
-                      onClick={() => startSprintMutation.mutate(planningSprint.id)}
-                      disabled={startSprintMutation.isPending}
-                      sx={{ fontWeight: 600 }}
-                    >
-                      {startSprintMutation.isPending ? 'Starting…' : 'Start Sprint'}
-                    </Button>
-                  </span>
-                </Tooltip>
-              );
-            })()}
 
             <Tooltip
               title={aiPlanMutation.isPending ? 'AI is analysing and allocating stories — this takes 30–90 seconds' : ''}
@@ -1304,6 +1461,8 @@ const SprintPlanningPage: React.FC = () => {
                     }
                     onDelete={(sprintId) => deleteSprintMutation.mutate(sprintId)}
                     onGenerateTasksForSprint={handleGenerateTasksForSprint}
+                    onStartSprint={(sprintId, stories) => handleStartSprint(sprintId, stories)}
+                    startingSprintId={startingSprintId}
                     taskGenStatus={taskGenStatus}
                     onCreateTask={handleCreateTask}
                   />

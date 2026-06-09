@@ -9,12 +9,19 @@ import {
 } from '@mui/material'
 import { PersonAdd, Delete } from '@mui/icons-material'
 import { projectsApi } from '@/api/projects'
-import { organizationsApi } from '@/api/organizations'
+import { get } from '@/api/client'
 import { useAuthStore } from '@store/authStore'
 import type { ProjectMember } from '@/types/project.types'
-import type { OrgMember } from '@/types'
 
 type ProjectRole = 'owner' | 'manager' | 'developer' | 'viewer'
+
+interface UserSummary {
+  id: string
+  email: string
+  full_name: string
+  role: string
+  is_active: boolean
+}
 
 const ROLE_COLORS: Record<ProjectRole, string> = {
   owner:     '#6366f1',
@@ -33,11 +40,10 @@ const ROLE_LABELS: Record<ProjectRole, string> = {
 export default function ProjectMembersPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const qc = useQueryClient()
-  const currentUser  = useAuthStore(s => s.user)
-  const organization = useAuthStore(s => s.organization)
+  const currentUser = useAuthStore(s => s.user)
 
   const [addOpen,  setAddOpen]  = useState(false)
-  const [selected, setSelected] = useState<OrgMember | null>(null)
+  const [selected, setSelected] = useState<UserSummary | null>(null)
   const [newRole,  setNewRole]  = useState<ProjectRole>('developer')
 
   const { data: members = [], isLoading, error } = useQuery({
@@ -46,25 +52,23 @@ export default function ProjectMembersPage() {
     enabled:  !!projectId,
   })
 
-  const { data: orgMembersPage } = useQuery({
-    queryKey: ['org-members', organization?.id],
-    queryFn:  () => organizationsApi.listMembers(organization!.id),
-    enabled:  !!organization?.id && addOpen,
+  const { data: allUsersResp } = useQuery({
+    queryKey: ['all-users'],
+    queryFn:  () => get<{ data: UserSummary[]; meta: any }>('/users?page_size=500'),
+    enabled:  addOpen,
   })
 
   const alreadyAdded = new Set((members as ProjectMember[]).map(m => m.userId))
-  const orgMembersList: OrgMember[] = Array.isArray(orgMembersPage)
-    ? orgMembersPage
-    : (orgMembersPage as any)?.data ?? []
-  const candidates = orgMembersList.filter(om => !alreadyAdded.has(om.userId))
+  const allUsers: UserSummary[] = (allUsersResp as any)?.data ?? []
+  const candidates = allUsers.filter(u => u.is_active && !alreadyAdded.has(u.id))
 
   const addMember = useMutation({
-    mutationFn: () => projectsApi.addMember(projectId!, selected!.userId, newRole),
+    mutationFn: () => projectsApi.addMember(projectId!, selected!.id, newRole),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['project-members', projectId] })
       setAddOpen(false)
       setSelected(null)
-      setNewRole('contributor')
+      setNewRole('developer')
     },
   })
 
@@ -185,11 +189,11 @@ export default function ProjectMembersPage() {
           <Stack spacing={2} sx={{ mt: 0.5 }}>
             <Autocomplete
               options={candidates}
-              getOptionLabel={(o: OrgMember) => `${o.user?.displayName ?? o.userId} (${o.user?.email ?? ''})`}
+              getOptionLabel={(o: UserSummary) => `${o.full_name || o.email} (${o.email})`}
               value={selected}
               onChange={(_, v) => setSelected(v)}
-              renderInput={params => <TextField {...params} label="Search member" size="small" />}
-              noOptionsText={orgMembersPage ? 'All org members already added' : 'Loading…'}
+              renderInput={params => <TextField {...params} label="Search user" size="small" />}
+              noOptionsText={allUsersResp ? 'All users already added' : 'Loading…'}
             />
             <FormControl size="small" fullWidth>
               <Select

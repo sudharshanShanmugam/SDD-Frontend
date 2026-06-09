@@ -11,6 +11,7 @@ import {
   DialogTitle,
   FormControl,
   IconButton,
+  InputAdornment,
   InputLabel,
   Menu,
   MenuItem,
@@ -36,6 +37,10 @@ import {
   SupervisorAccountOutlined,
   DeleteOutlined,
   EditOutlined,
+  VisibilityOutlined,
+  VisibilityOffOutlined,
+  ContentCopyOutlined,
+  CheckOutlined,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
@@ -72,6 +77,7 @@ const createUserSchema = z.object({
   email: z.string().email('Enter a valid email address'),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   role: z.string().min(1, 'Select a role'),
   organization: z.string().min(1, 'Select an organization'),
 });
@@ -83,7 +89,7 @@ type CreateUserFormValues = z.infer<typeof createUserSchema>;
 interface UserRowActionsProps {
   row: UserRow;
   canImpersonate: boolean;
-  onAction: (action: 'edit' | 'suspend' | 'activate' | 'impersonate' | 'delete', row: UserRow) => void;
+  onAction: (action: 'edit' | 'suspend' | 'activate' | 'impersonate' | 'delete' | 'reset-password', row: UserRow) => void;
 }
 
 function UserRowActions({ row, canImpersonate, onAction }: UserRowActionsProps) {
@@ -98,6 +104,10 @@ function UserRowActions({ row, canImpersonate, onAction }: UserRowActionsProps) 
         <MenuItem onClick={() => { onAction('edit', row); setAnchor(null); }}>
           <EditOutlined fontSize="small" sx={{ mr: 1 }} />
           Edit
+        </MenuItem>
+        <MenuItem onClick={() => { onAction('reset-password', row); setAnchor(null); }}>
+          <VisibilityOutlined fontSize="small" sx={{ mr: 1 }} />
+          Reset Password
         </MenuItem>
         {row.is_active && (
           <MenuItem onClick={() => { onAction('suspend', row); setAnchor(null); }}>
@@ -140,8 +150,42 @@ interface CreateUserDialogProps {
   onCreated: () => void;
 }
 
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <TextField
+      label={label}
+      value={value}
+      size="small"
+      fullWidth
+      slotProps={{
+        input: {
+          readOnly: true,
+          endAdornment: (
+            <InputAdornment position="end">
+              <Tooltip title={copied ? 'Copied!' : 'Copy'}>
+                <IconButton size="small" onClick={handleCopy} edge="end">
+                  {copied ? <CheckOutlined fontSize="small" color="success" /> : <ContentCopyOutlined fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            </InputAdornment>
+          ),
+        },
+      }}
+    />
+  );
+}
+
 function CreateUserDialog({ open, onClose, onCreated }: CreateUserDialogProps) {
   const toast = useUIStore((s) => s.toast);
+  const [showPassword, setShowPassword] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
 
   const { data: orgsData } = useQuery({
     queryKey: ['admin', 'orgs-picker'],
@@ -161,6 +205,7 @@ function CreateUserDialog({ open, onClose, onCreated }: CreateUserDialogProps) {
       email: '',
       firstName: '',
       lastName: '',
+      password: '',
       role: 'developer',
       organization: '',
     },
@@ -168,10 +213,9 @@ function CreateUserDialog({ open, onClose, onCreated }: CreateUserDialogProps) {
 
   const createMutation = useMutation({
     mutationFn: (data: CreateUserFormValues) => post('/admin/users', data),
-    onSuccess: () => {
-      toast.success('User created successfully');
-      reset();
+    onSuccess: (_resp, variables) => {
       onCreated();
+      setCreatedCreds({ email: variables.email, password: variables.password });
     },
     onError: (err: any) => {
       const detail = err?.response?.data?.detail;
@@ -188,8 +232,53 @@ function CreateUserDialog({ open, onClose, onCreated }: CreateUserDialogProps) {
     createMutation.mutate(data);
   }
 
+  function handleClose() {
+    setCreatedCreds(null);
+    reset();
+    onClose();
+  }
+
+  // ── Success screen — show credentials to share ──────────────────────────────
+  if (createdCreds) {
+    return (
+      <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <CheckCircleOutlined color="success" />
+            <span>User Created</span>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <Typography variant="body2" color="text.secondary">
+              Share these login credentials with the user. The password cannot be viewed again after closing this dialog.
+            </Typography>
+            <CopyField label="Email" value={createdCreds.email} />
+            <CopyField label="Password" value={createdCreds.password} />
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ContentCopyOutlined fontSize="small" />}
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  `Email: ${createdCreds.email}\nPassword: ${createdCreds.password}`
+                );
+                toast.success('Credentials copied to clipboard');
+              }}
+            >
+              Copy Both
+            </Button>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button variant="contained" onClick={handleClose}>Done</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogTitle>Create New User</DialogTitle>
         <DialogContent>
@@ -242,6 +331,33 @@ function CreateUserDialog({ open, onClose, onCreated }: CreateUserDialogProps) {
             />
 
             <Controller
+              name="password"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  label="Password"
+                  type={showPassword ? 'text' : 'password'}
+                  error={!!errors.password}
+                  helperText={errors.password?.message}
+                  fullWidth
+                  size="small"
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => setShowPassword((v) => !v)} edge="end">
+                            {showPassword ? <VisibilityOffOutlined fontSize="small" /> : <VisibilityOutlined fontSize="small" />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              )}
+            />
+
+            <Controller
               name="role"
               control={control}
               render={({ field }) => (
@@ -287,7 +403,7 @@ function CreateUserDialog({ open, onClose, onCreated }: CreateUserDialogProps) {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClose} disabled={createMutation.isPending}>
+          <Button onClick={handleClose} disabled={createMutation.isPending}>
             Cancel
           </Button>
           <Button
@@ -440,6 +556,103 @@ function EditUserDialog({ user, onClose, onSaved }: EditUserDialogProps) {
   );
 }
 
+// ── Reset password dialog ─────────────────────────────────────────────────────
+
+interface ResetPasswordDialogProps {
+  user: UserRow | null;
+  onClose: () => void;
+}
+
+function ResetPasswordDialog({ user, onClose }: ResetPasswordDialogProps) {
+  const toast = useUIStore((s) => s.toast);
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: () => put(`/admin/users/${user!.id}/reset-password`, { password }),
+    onSuccess: () => { setDone(true); },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.detail ?? 'Failed to reset password');
+    },
+  });
+
+  function handleClose() {
+    setPassword('');
+    setShowPw(false);
+    setDone(false);
+    onClose();
+  }
+
+  if (done) {
+    return (
+      <Dialog open={Boolean(user)} onClose={handleClose} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <CheckCircleOutlined color="success" />
+            <span>Password Reset</span>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <Typography variant="body2" color="text.secondary">
+              Password updated for <strong>{user?.email}</strong>. Share these credentials:
+            </Typography>
+            <CopyField label="Email" value={user?.email ?? ''} />
+            <CopyField label="New Password" value={password} />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button variant="contained" onClick={handleClose}>Done</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={Boolean(user)} onClose={handleClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Reset Password</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} mt={1}>
+          <Typography variant="body2" color="text.secondary">
+            Set a new password for <strong>{user?.email}</strong>.
+          </Typography>
+          <TextField
+            label="New Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type={showPw ? 'text' : 'password'}
+            size="small"
+            fullWidth
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setShowPw((v) => !v)} edge="end">
+                      {showPw ? <VisibilityOffOutlined fontSize="small" /> : <VisibilityOutlined fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={handleClose} disabled={mutation.isPending}>Cancel</Button>
+        <Button
+          variant="contained"
+          disabled={password.length < 6 || mutation.isPending}
+          onClick={() => mutation.mutate()}
+          startIcon={mutation.isPending ? <CircularProgress size={14} /> : undefined}
+        >
+          Reset Password
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // ── Impersonate confirmation ───────────────────────────────────────────────────
 
 interface ImpersonateDialogProps {
@@ -509,6 +722,7 @@ export default function UserManagementPage({ embedded }: UserManagementPageProps
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<UserRow | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<UserRow | null>(null);
   const [impersonateTarget, setImpersonateTarget] = useState<UserRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
   const [selectedRows, setSelectedRows] = useState<GridRowSelectionModel>([]);
@@ -572,10 +786,13 @@ export default function UserManagementPage({ embedded }: UserManagementPageProps
     onError: () => toast.error('Bulk activate failed'),
   });
 
-  function handleAction(action: 'edit' | 'suspend' | 'activate' | 'impersonate' | 'delete', row: UserRow) {
+  function handleAction(action: 'edit' | 'suspend' | 'activate' | 'impersonate' | 'delete' | 'reset-password', row: UserRow) {
     switch (action) {
       case 'edit':
         setEditTarget(row);
+        break;
+      case 'reset-password':
+        setResetPasswordTarget(row);
         break;
       case 'suspend':
         suspendMutation.mutate(row.id);
@@ -832,6 +1049,11 @@ export default function UserManagementPage({ embedded }: UserManagementPageProps
           setEditTarget(null);
           queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
         }}
+      />
+
+      <ResetPasswordDialog
+        user={resetPasswordTarget}
+        onClose={() => setResetPasswordTarget(null)}
       />
 
       <ImpersonateDialog
