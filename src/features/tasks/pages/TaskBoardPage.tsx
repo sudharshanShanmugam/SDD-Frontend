@@ -118,9 +118,7 @@ function TaskCardView({ task, dragging = false }: {
         </Stack>
         <Typography variant="body2" fontWeight={500} sx={{ mb: 1.25, lineHeight: 1.45 }}>{task.title}</Typography>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" spacing={0.75} flexWrap="wrap">
-            {task.type && <Chip label={TASK_TYPE_LABELS[task.type as TaskType] ?? task.type} size="small" sx={{ fontSize: '0.6875rem', height: 20 }} />}
-          </Stack>
+          <Stack direction="row" spacing={0.75} flexWrap="wrap" />
           <Stack direction="row" spacing={0.75} alignItems="center">
             {task.estimatedHours != null && (
               <Chip label={`${task.estimatedHours}h`} size="small" variant="outlined" sx={{ fontSize: '0.6875rem', height: 20 }} />
@@ -265,7 +263,6 @@ function SortableTaskCard({ task, onDetailClick }: { task: Task; onDetailClick: 
         <Typography variant="body2" fontWeight={500} sx={{ mb: 1.25, lineHeight: 1.45 }}>{task.title}</Typography>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Stack direction="row" spacing={0.75} flexWrap="wrap">
-            {task.type && <Chip label={TASK_TYPE_LABELS[task.type as TaskType] ?? task.type} size="small" sx={{ fontSize: '0.6875rem', height: 20 }} />}
             {task.tags?.slice(0, 1).map(tag => (
               <Chip key={tag} label={tag} size="small" variant="outlined" sx={{ fontSize: '0.6875rem', height: 20 }} />
             ))}
