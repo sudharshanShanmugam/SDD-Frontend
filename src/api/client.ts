@@ -39,6 +39,26 @@ export const apiClient: AxiosInstance = axios.create({
 let _loggingOut = false;
 export function resetLogoutGuard() { _loggingOut = false; }
 
+// Serialise concurrent refresh calls so only one hits the backend
+let _refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = (async () => {
+    const { tokens, setAuthFromLogin } = useAuthStore.getState();
+    const refreshToken = tokens?.refreshToken;
+    if (!refreshToken) throw new Error('No refresh token');
+    const resp = await axios.post(
+      apiClient.defaults.baseURL + '/auth/refresh',
+      { refresh_token: refreshToken },
+    );
+    const data = resp.data as { access_token: string; refresh_token: string; expires_in: number; user?: any };
+    setAuthFromLogin(data);
+    return data.access_token;
+  })().finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+}
+
 // ============================================================
 // Request Interceptor — Request ID + Logging
 // ============================================================
@@ -103,14 +123,24 @@ apiClient.interceptors.response.use(
   (error: unknown) => {
     if (!isAxiosError(error)) return Promise.reject(error);
 
-    // ── 401 — Session expired/revoked → auto logout ───────
-    // Auto-logout only on clear token-expiry/revocation signals.
-    // AUTHENTICATION_FAILED means "no token sent" — could be a race on first load,
-    // so we do NOT include it here; only true session-expiry codes trigger logout.
+    // ── 401 — Try silent token refresh, log out only if refresh fails ─
     const errorCode = (error.response?.data as any)?.error_code as string | undefined;
-    const isSessionExpired = error.response?.status === 401 &&
-      (errorCode === 'TOKEN_EXPIRED' || errorCode === 'TOKEN_REVOKED');
-    if (isSessionExpired) {
+    const isExpired  = error.response?.status === 401 && errorCode === 'TOKEN_EXPIRED';
+    const isRevoked  = error.response?.status === 401 && errorCode === 'TOKEN_REVOKED';
+
+    if (isExpired && error.config && !(error.config as any)._retry) {
+      (error.config as any)._retry = true;
+      try {
+        const newToken = await refreshAccessToken();
+        error.config.headers = error.config.headers ?? {};
+        error.config.headers['Authorization'] = `Bearer ${newToken}`;
+        return apiClient.request(error.config);
+      } catch {
+        // Refresh failed — fall through to logout
+      }
+    }
+
+    if (isRevoked || (isExpired && (error.config as any)?._retry)) {
       if (!_loggingOut) {
         _loggingOut = true;
         localStorage.removeItem('sdd_auth_v2');

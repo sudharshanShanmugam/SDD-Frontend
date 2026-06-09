@@ -546,9 +546,10 @@ export function TaskBoardPage(): React.JSX.Element {
 
   const allTasks: Task[] = (data as any)?.data ?? []
 
-  // Show only tasks belonging to active sprint stories; fall back to all tasks
+  // Show only tasks for stories in the active sprint; nothing if no sprint is active
   const tasks: Task[] = useMemo(() => {
-    if (!activeSprint || sprintStoryIds.size === 0) return allTasks
+    if (!activeSprint) return []
+    if (sprintStoryIds.size === 0) return []
     return allTasks.filter((t) => sprintStoryIds.has(t.storyId as string))
   }, [allTasks, activeSprint, sprintStoryIds])
 
@@ -775,16 +776,18 @@ export function TaskBoardPage(): React.JSX.Element {
       {!isLoading && tasks.length === 0 && (
         <EmptyState
           variant="no-data"
-          title={activeSprint ? `No tasks in ${activeSprint.name} yet` : 'No tasks yet'}
+          title={activeSprint ? `No tasks in ${activeSprint.name} yet` : 'No active sprint'}
           description={
-            activeSprint && sprintStoryIds.size > 0
+            !activeSprint
+              ? 'Start a sprint from Sprint Planning to see tasks here.'
+              : activeSprint && sprintStoryIds.size > 0
               ? `${activeSprint.name} has ${sprintStoryIds.size} stories but no tasks. Create default tasks (Implementation, Tests, Review) for each story instantly.`
               : 'Tasks track the work inside a user story. Create one with Add Task, or generate them from Sprint Planning.'
           }
-          action={{
+          action={activeSprint ? {
             label: settingUp ? (setupProgress || 'Creating tasks…') : 'Setup All Sprint Tasks',
             onClick: handleSetupSprintTasks,
-          }}
+          } : undefined}
         />
       )}
 
