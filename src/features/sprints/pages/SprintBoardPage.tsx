@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Box,
   Typography,
@@ -22,6 +22,8 @@ import {
   ArrowBack,
   EmojiEvents,
   CalendarMonth,
+  AutoAwesome,
+  TaskAlt,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -29,6 +31,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@store/uiStore';
 import { sprintsApi } from '@/api/sprints';
 import { storiesApi } from '@/api/stories';
+import { apiClient } from '@/api/client';
 import SprintKanban from '../components/SprintKanban';
 import type { StoryStatus, Sprint, SprintSummary } from '@/types';
 
@@ -112,6 +115,7 @@ const SprintBoardPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useUIStore();
+  const [taskGenStatus, setTaskGenStatus] = useState<'idle' | 'loading' | 'done'>('idle');
 
   // ── Fetch all sprints (for selector) ──
   const {
@@ -205,6 +209,23 @@ const SprintBoardPage: React.FC = () => {
     },
     [queryClient, currentSprintId, storyStatusMutation],
   );
+
+  const handleGenerateTasks = useCallback(async () => {
+    const storyIds = boardSprint?.stories?.map((s) => s.id) ?? [];
+    if (!storyIds.length) return;
+    setTaskGenStatus('loading');
+    try {
+      await Promise.all(
+        storyIds.map((id) => apiClient.post(`/ai/generate-tasks/${id}`, {}))
+      );
+      setTaskGenStatus('done');
+      toast.success('Tasks generated for all stories!');
+      queryClient.invalidateQueries({ queryKey: ['sprint-board', currentSprintId] });
+    } catch {
+      setTaskGenStatus('idle');
+      toast.error('Failed to generate tasks');
+    }
+  }, [boardSprint, currentSprintId, queryClient, toast]);
 
   const handleSprintSelect = (id: string) => {
     navigate(`/projects/${projectId}/sprints/${id}`);
@@ -368,20 +389,42 @@ const SprintBoardPage: React.FC = () => {
 
             {/* ── Action buttons vary by sprint state ── */}
             {isPlanning && (
-              <Button
-                variant="contained"
-                startIcon={
-                  startMutation.isPending ? (
-                    <CircularProgress size={16} color="inherit" />
-                  ) : (
-                    <PlayArrow />
-                  )
-                }
-                onClick={() => startMutation.mutate()}
-                disabled={startMutation.isPending}
-              >
-                Start Sprint
-              </Button>
+              <>
+                <Button
+                  variant="outlined"
+                  startIcon={
+                    taskGenStatus === 'loading' ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : taskGenStatus === 'done' ? (
+                      <TaskAlt />
+                    ) : (
+                      <AutoAwesome />
+                    )
+                  }
+                  onClick={handleGenerateTasks}
+                  disabled={taskGenStatus === 'loading' || !(boardSprint?.stories?.length)}
+                >
+                  {taskGenStatus === 'loading'
+                    ? 'Generating…'
+                    : taskGenStatus === 'done'
+                    ? 'Tasks Generated'
+                    : 'Generate Tasks'}
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={
+                    startMutation.isPending ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <PlayArrow />
+                    )
+                  }
+                  onClick={() => startMutation.mutate()}
+                  disabled={startMutation.isPending}
+                >
+                  Start Sprint
+                </Button>
+              </>
             )}
 
             {isActive && (
@@ -456,7 +499,7 @@ const SprintBoardPage: React.FC = () => {
         >
           <PlayArrow sx={{ fontSize: 15, color: 'info.main' }} />
           <Typography variant="caption" color="info.dark">
-            Sprint is in planning. Click <strong>Start Sprint</strong> to activate it and begin tracking progress.
+            Sprint is in planning. Click <strong>Generate Tasks</strong> to create dev tasks for all stories, then <strong>Start Sprint</strong> to activate it.
           </Typography>
         </Box>
       )}
