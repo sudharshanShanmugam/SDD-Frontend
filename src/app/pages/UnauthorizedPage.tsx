@@ -4,9 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
 
 export default function UnauthorizedPage() {
-  const navigate = useNavigate()
-  const role     = useAuthStore(s => s.currentRole())
-  const logout   = useAuthStore(s => s.logout)
+  const navigate    = useNavigate()
+  const role        = useAuthStore(s => s.currentRole())
+  const logout      = useAuthStore(s => s.logout)
+  const canAccess   = useAuthStore(s => s.canAccess)
+
+  const home = canAccess('dashboard') ? '/dashboard' : '/workspaces'
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2 }}>
@@ -17,7 +20,7 @@ export default function UnauthorizedPage() {
         Contact your administrator if you need access.
       </Typography>
       <Box sx={{ display: 'flex', gap: 1.5 }}>
-        <Button variant="contained" onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
+        <Button variant="contained" onClick={() => navigate(home)}>Go to Home</Button>
         <Button variant="outlined" onClick={() => { logout(); navigate('/login') }}>Switch Account</Button>
       </Box>
     </Box>

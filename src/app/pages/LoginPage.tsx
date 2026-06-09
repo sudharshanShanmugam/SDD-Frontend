@@ -18,7 +18,8 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
-  const from = (location.state as any)?.from?.pathname ?? '/dashboard'
+  const canAccess = useAuthStore(s => s.canAccess)
+  const fromPath  = (location.state as any)?.from?.pathname
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -30,7 +31,11 @@ export default function LoginPage() {
       if (!data.access_token) throw new Error('Invalid response from server')
       resetLogoutGuard()
       setAuthFromLogin(data)
-      navigate(from, { replace: true })
+      // After store is updated, determine home based on role
+      const home = fromPath && fromPath !== '/unauthorized'
+        ? fromPath
+        : canAccess('dashboard') ? '/dashboard' : '/workspaces'
+      navigate(home, { replace: true })
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? err?.message ?? 'Login failed')
     } finally {
