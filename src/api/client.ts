@@ -33,6 +33,9 @@ export const apiClient: AxiosInstance = axios.create({
   withCredentials: true,   // Send cookies for CSRF protection
 });
 
+// Guard against multiple concurrent logout redirects
+let _loggingOut = false;
+
 // ============================================================
 // Request Interceptor — Request ID + Logging
 // ============================================================
@@ -112,10 +115,13 @@ apiClient.interceptors.response.use(
     ]);
     const errorCode = (error.response?.data as any)?.error_code as string | undefined;
     if (error.response?.status === 401 && errorCode && SESSION_EXPIRED_CODES.has(errorCode)) {
-      import('@store/authStore').then(({ useAuthStore }) => {
-        useAuthStore.getState().logout();
-      });
-      window.location.href = '/login';
+      if (!_loggingOut) {
+        _loggingOut = true;
+        // Clear auth state synchronously before redirecting so the page
+        // reload doesn't re-hydrate stale tokens from localStorage.
+        localStorage.removeItem('sdd_auth_v2');
+        window.location.replace('/login');
+      }
       return Promise.reject(error);
     }
 
