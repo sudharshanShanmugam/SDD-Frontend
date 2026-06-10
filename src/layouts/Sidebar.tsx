@@ -243,11 +243,6 @@ export default function Sidebar({ collapsed }: SidebarProps): React.JSX.Element 
             href: `/projects/${effectiveProjectId}/tasks`,
             icon: <CheckSquare />,
           }] : []),
-          ...(canAccess('qa') ? [{
-            label: 'QA Dashboard',
-            href: `/projects/${effectiveProjectId}/qa`,
-            icon: <FlaskConical />,
-          }] : []),
           ...(canAccess('releases') ? [{
             label: 'Releases',
             href: `/projects/${effectiveProjectId}/releases`,
